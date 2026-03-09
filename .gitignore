@@ -20,7 +20,6 @@ env/
 ENV/
 
 # Data and outputs (exclude from version control)
-data/graph.json
 data/sentinel_state.json
 raw_ingest/*.json
 output/
