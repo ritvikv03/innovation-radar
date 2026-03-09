@@ -845,6 +845,12 @@ with tab5:
             with open(graph_path, 'r') as f:
                 graph_data = json.load(f)
 
+            # Mirror links/edges to prevent NetworkX version KeyErrors across environments
+            if 'links' in graph_data and 'edges' not in graph_data:
+                graph_data['edges'] = graph_data['links']
+            elif 'edges' in graph_data and 'links' not in graph_data:
+                graph_data['links'] = graph_data['edges']
+
             G = nx.node_link_graph(graph_data)
 
             # Display stats
