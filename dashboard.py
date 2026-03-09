@@ -910,13 +910,13 @@ with tab5:
                     use_container_width=True,
                     hide_index=True,
                     column_config={
-                        "Source": st.column_config.TextColumn("📍 Source Node", width="medium"),
-                        "Relationship": st.column_config.TextColumn("⚡ Causal Verb", width="small"),
-                        "Target": st.column_config.TextColumn("🎯 Target Node", width="medium"),
-                        "Weight": st.column_config.NumberColumn("📊 Weight", format="%.2f", width="small"),
-                        "Effect": st.column_config.TextColumn("↗️ Effect Type", width="small"),
-                        "Evidence Quote": st.column_config.TextColumn("📜 Quote", width="large"),
-                        "Source URL": st.column_config.LinkColumn("🔗 Source", width="medium")
+                        "Source": st.column_config.TextColumn("📍 Source Node", width="medium", help="The inciting PESTEL entity that triggered the disruption."),
+                        "Relationship": st.column_config.TextColumn("⚡ Causal Verb", width="small", help="The physical action explaining how the source affects the target."),
+                        "Target": st.column_config.TextColumn("🎯 Target Node", width="medium", help="The resulting PESTEL entity that is being impacted."),
+                        "Weight": st.column_config.NumberColumn("📊 Weight", format="%.2f", width="small", help="The mathematical strength (-1.0 to 1.0) of the ripple effect."),
+                        "Effect": st.column_config.TextColumn("↗️ Effect Type", width="small", help="Whether the trend is being accelerated (positive) or restricted (negative)."),
+                        "Evidence Quote": st.column_config.TextColumn("📜 Quote", width="large", help="Exact text pulled from the intelligence agent justifying this link."),
+                        "Source URL": st.column_config.LinkColumn("🔗 Source", width="medium", help="Direct link to the source document for verification.")
                     }
                 )
 
