@@ -1,0 +1,19 @@
+2026-03-05T07:09:50.944Z [DEBUG] detectFileEncoding failed for expected reason: ENOENT
+2026-03-05T07:09:50.950Z [DEBUG] MDM settings load completed in 7ms
+2026-03-05T07:09:50.953Z [DEBUG] detectFileEncoding failed for expected reason: ENOENT
+2026-03-05T07:09:50.953Z [DEBUG] Broken symlink or missing file encountered for settings.json at path: /home/node/.claude/settings.json
+2026-03-05T07:09:50.955Z [DEBUG] detectFileEncoding failed for expected reason: ENOENT
+2026-03-05T07:09:50.956Z [DEBUG] Broken symlink or missing file encountered for settings.json at path: /home/node/.claude/settings.json
+2026-03-05T07:09:50.985Z [DEBUG] detectFileEncoding failed for expected reason: ENOENT
+2026-03-05T07:09:50.985Z [DEBUG] Broken symlink or missing file encountered for settings.json at path: /etc/claude-code/managed-settings.json
+2026-03-05T07:09:50.985Z [DEBUG] detectFileEncoding failed for expected reason: ENOENT
+2026-03-05T07:09:50.985Z [DEBUG] Broken symlink or missing file encountered for settings.json at path: /etc/claude-code/managed-settings.json
+2026-03-05T07:09:50.987Z [DEBUG] [init] configureGlobalMTLS starting
+2026-03-05T07:09:50.987Z [DEBUG] [init] configureGlobalMTLS complete
+2026-03-05T07:09:50.987Z [DEBUG] [init] configureGlobalAgents starting
+2026-03-05T07:09:50.987Z [DEBUG] [init] configureGlobalAgents complete
+2026-03-05T07:09:50.992Z [DEBUG] Error log sink initialized
+2026-03-05T07:09:50.994Z [DEBUG] detectFileEncoding failed for expected reason: ENOENT
+2026-03-05T07:09:50.994Z [DEBUG] Broken symlink or missing file encountered for settings.json at path: /home/node/.claude/settings.json
+2026-03-05T07:09:51.016Z [DEBUG] Git remote URL: null
+2026-03-05T07:09:51.016Z [DEBUG] No git remote URL found

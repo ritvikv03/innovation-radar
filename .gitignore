@@ -1,0 +1,43 @@
+# Environment variables and secrets
+.env
+.env.local
+*.key
+*.pem
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Data and outputs (exclude from version control)
+data/graph.json
+data/sentinel_state.json
+raw_ingest/*.json
+output/
+test_outputs/
+q2_solution/outputs/
+q2_solution/test_outputs/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
