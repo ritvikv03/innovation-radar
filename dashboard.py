@@ -38,12 +38,30 @@ except ImportError:
 
 load_dotenv()
 
-# Add q2_solution to path
+# Add q2_solution to path — multiple strategies for local vs Streamlit Cloud
 PROJECT_ROOT = Path(__file__).parent.absolute()
-sys.path.insert(0, str(PROJECT_ROOT / "q2_solution"))
+_q2_path = str(PROJECT_ROOT / "q2_solution")
+if _q2_path not in sys.path:
+    sys.path.insert(0, _q2_path)
 
-from database import SignalDatabase
-from innovation_radar import InnovationRadar, PESTEL_COLORS
+try:
+    from database import SignalDatabase
+except ImportError:
+    sys.path.insert(0, str(PROJECT_ROOT))
+    from q2_solution.database import SignalDatabase
+
+try:
+    from innovation_radar import InnovationRadar, PESTEL_COLORS
+except ImportError:
+    try:
+        from q2_solution.innovation_radar import InnovationRadar, PESTEL_COLORS
+    except ImportError:
+        from q2_solution.innovation_radar import InnovationRadar
+        PESTEL_COLORS = {
+            'POLITICAL': '#e41a1c', 'ECONOMIC': '#377eb8', 'SOCIAL': '#4daf4a',
+            'TECHNOLOGICAL': '#984ea3', 'ENVIRONMENTAL': '#ff7f00', 'LEGAL': '#ffff33',
+            'INNOVATION': '#00ccff', 'SOCIAL_MEDIA': '#ff69b4',
+        }
 
 def get_api_key():
     """Get Gemini API key from Streamlit secrets (cloud) or env (local)."""
