@@ -6,6 +6,7 @@ networkx>=3.0          # Knowledge Graph engine
 requests>=2.31.0       # HTTP requests for APIs
 beautifulsoup4>=4.12.0 # HTML parsing (Scout agent)
 python-dotenv>=1.0.0   # Environment variable management
+google-generativeai>=0.4.0 # Gemini API integration
 
 # Data Processing
 pandas>=2.0.0          # Data manipulation (for Eurostat/FAOSTAT processing)
