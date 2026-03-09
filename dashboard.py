@@ -39,6 +39,15 @@ sys.path.insert(0, str(PROJECT_ROOT / "q2_solution"))
 from database import SignalDatabase
 from innovation_radar import InnovationRadar
 
+def get_api_key():
+    """Get Gemini API key from Streamlit secrets (cloud) or env (local)."""
+    try:
+        if "GEMINI_API_KEY" in st.secrets:
+            return st.secrets["GEMINI_API_KEY"]
+    except Exception:
+        pass
+    return os.getenv("GEMINI_API_KEY")
+
 # ===========================
 # PAGE CONFIGURATION
 # ===========================
@@ -124,7 +133,7 @@ def generate_bluf_narrative(db_stats: Dict, signals: List[Dict]) -> str:
     Returns:
         str: 3-sentence BLUF narrative
     """
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = get_api_key()
 
     # Analyze signal distribution
     df = pd.DataFrame(signals)
@@ -238,7 +247,7 @@ def generate_strategic_questions(critical_signals: List[Dict]) -> List[str]:
         List of strategic questions
     """
     # Get API key from environment
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = get_api_key()
 
     # Prepare signal context
     signal_summaries = []
@@ -756,7 +765,7 @@ with tab4:
                 with st.chat_message("assistant"):
                     with st.spinner("Claude is thinking..."):
                         try:
-                            api_key = os.getenv("GEMINI_API_KEY")
+                            api_key = get_api_key()
                             genai.configure(api_key=api_key)
                             model = genai.GenerativeModel('gemini-2.5-flash')
 
