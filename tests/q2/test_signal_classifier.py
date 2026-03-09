@@ -121,6 +121,94 @@ def test_temporal_metadata_extraction():
     print("✓ test_temporal_metadata_extraction passed")
 
 
+def test_temporal_urgency_current_year_is_high():
+    """Current year (2026) in signal content must produce HIGH urgency, not MEDIUM."""
+    from datetime import datetime
+    classifier = SignalClassifier()
+    current_year = str(datetime.now().year)
+
+    signal = {
+        'title': f'EU CAP Reform Deadline Set for {current_year}',
+        'content': f'European Commission confirms mandatory compliance by {current_year}. '
+                  f'Member states must implement changes before end of {current_year}.',
+        'source': 'EUR-Lex',
+        'url': 'https://eur-lex.europa.eu/test',
+        'date': f'{current_year}-01-01'
+    }
+
+    result = classifier.classify_signal(signal)
+    temporal = result['temporal_metadata']
+
+    assert temporal['urgency'] == 'HIGH', \
+        f"Current year {current_year} should yield HIGH urgency, got {temporal['urgency']}"
+    assert temporal['time_horizon'] == '12_MONTH', \
+        f"Current year {current_year} should yield 12_MONTH, got {temporal['time_horizon']}"
+
+
+def test_temporal_urgency_past_year_is_not_high():
+    """A year that is now in the past (2024) must NOT produce HIGH urgency."""
+    classifier = SignalClassifier()
+
+    signal = {
+        'title': 'Historical Review of 2024 Farm Subsidy Changes',
+        'content': 'Analysis of subsidy reforms introduced in 2024 and their outcomes.',
+        'source': 'Eurostat',
+        'url': 'https://eurostat.ec.europa.eu/test',
+        'date': '2026-01-01'
+    }
+
+    result = classifier.classify_signal(signal)
+    temporal = result['temporal_metadata']
+
+    assert temporal['urgency'] != 'HIGH', \
+        f"Past year 2024 should NOT yield HIGH urgency, got {temporal['urgency']}"
+
+
+def test_classify_innovation_signal():
+    """A Fendt product launch at Agritechnica must classify as INNOVATION, not TECHNOLOGICAL."""
+    classifier = SignalClassifier()
+
+    signal = {
+        'title': 'Fendt Unveils New Vario 900 Concept Machine at Agritechnica',
+        'content': 'Fendt announced the commercial release of its next-generation concept machine '
+                  'at Agritechnica. The new model enters the market in 2027 following a successful '
+                  'prototype demonstration. Dealer launch events confirmed across Germany and France.',
+        'source': 'Agritechnica Press',
+        'url': 'https://agritechnica.com/fendt-vario-900',
+        'date': '2026-11-15'
+    }
+
+    result = classifier.classify_signal(signal)
+
+    assert result['primary_dimension'] == 'INNOVATION', \
+        f"Product launch signal should classify as INNOVATION, got {result['primary_dimension']}"
+
+
+def test_classifier_tie_breaking_prefers_legal():
+    """On a PESTEL dimension tie, LEGAL must take priority over TECHNOLOGICAL."""
+    classifier = SignalClassifier()
+
+    # Craft a signal with exactly equal LEGAL and TECHNOLOGICAL keyword hits
+    # LEGAL keywords: regulation, law, directive, compliance, standard (5)
+    # TECHNOLOGICAL keywords: innovation, digital, automation, AI, robotics (5)
+    signal = {
+        'title': 'AI Regulation Compliance Standard',
+        'content': 'New directive mandates law on automation. Digital innovation robotics compliance.',
+        'source': 'EUR-Lex',
+        'url': 'https://eur-lex.europa.eu/test',
+        'date': '2026-01-01'
+    }
+
+    # Run twice to confirm determinism
+    result1 = classifier.classify_signal(signal)
+    result2 = classifier.classify_signal(signal)
+
+    assert result1['primary_dimension'] == result2['primary_dimension'], \
+        "Classifier must be deterministic on repeated calls with identical input"
+    assert result1['primary_dimension'] == 'LEGAL', \
+        f"On tie, LEGAL should win over TECHNOLOGICAL, got {result1['primary_dimension']}"
+
+
 if __name__ == "__main__":
     print("=" * 70)
     print("Running Signal Classifier Tests")
@@ -131,6 +219,10 @@ if __name__ == "__main__":
     test_classify_economic_signal()
     test_entity_extraction()
     test_temporal_metadata_extraction()
+    test_temporal_urgency_current_year_is_high()
+    test_temporal_urgency_past_year_is_not_high()
+    test_classify_innovation_signal()
+    test_classifier_tie_breaking_prefers_legal()
 
     print("\n" + "=" * 70)
     print("ALL TESTS PASSED ✓")

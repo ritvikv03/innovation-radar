@@ -161,6 +161,32 @@ def test_score_components():
     print("✓ test_score_components passed")
 
 
+def test_novelty_accounts_for_repeated_content_themes():
+    """A signal with a new title but same content themes as history should score lower novelty."""
+    historical = [
+        {
+            'title': 'EU bans diesel agricultural machinery',
+            'content': 'electric mandate regulation compliance enforcement ban diesel tractor'
+        }
+    ]
+    scorer = DisruptionScorer(historical_signals=historical)
+
+    # Different title, but shares same core content themes as historical signal
+    signal_repeated_content = {
+        'title': 'Brussels Acts on Farm Equipment Emissions',  # different title
+        'content': 'New electric mandate regulation compliance enforcement ban diesel tractor requirements.',
+        'primary_dimension': 'LEGAL',
+        'secondary_dimensions': [],
+        'entities': {'regulations': ['EU 2026/123'], 'technologies': ['electric']},
+        'temporal_metadata': {'time_horizon': '12_MONTH', 'urgency': 'HIGH', 'mentioned_years': ['2026']}
+    }
+
+    result = scorer.score_signal(signal_repeated_content)
+
+    assert result['novelty_score'] < 0.6, \
+        f"Signal with repeated content themes should score novelty < 0.6, got {result['novelty_score']:.3f}"
+
+
 if __name__ == "__main__":
     print("=" * 70)
     print("Running Disruption Scorer Tests")
@@ -171,6 +197,7 @@ if __name__ == "__main__":
     test_novelty_calculation()
     test_time_horizon_assignment()
     test_score_components()
+    test_novelty_accounts_for_repeated_content_themes()
 
     print("\n" + "=" * 70)
     print("ALL TESTS PASSED ✓")

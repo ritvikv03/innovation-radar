@@ -27,8 +27,14 @@ from pathlib import Path
 import sys
 import os
 from typing import List, Dict
-import google.generativeai as genai
 from dotenv import load_dotenv
+
+# Graceful Gemini import — app must render even if package is absent
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
 
 load_dotenv()
 
@@ -37,7 +43,7 @@ PROJECT_ROOT = Path(__file__).parent.absolute()
 sys.path.insert(0, str(PROJECT_ROOT / "q2_solution"))
 
 from database import SignalDatabase
-from innovation_radar import InnovationRadar
+from innovation_radar import InnovationRadar, PESTEL_COLORS
 
 def get_api_key():
     """Get Gemini API key from Streamlit secrets (cloud) or env (local)."""
@@ -47,6 +53,38 @@ def get_api_key():
     except Exception:
         pass
     return os.getenv("GEMINI_API_KEY")
+
+
+def _empty_state(icon: str, title: str, message: str, action: str = "") -> None:
+    """Render a stylized, enterprise-grade empty state card."""
+    action_html = (
+        f"<p style='color:#888;margin:10px 0 0 0;font-size:13px;'>{action}</p>"
+        if action else ""
+    )
+    st.markdown(f"""
+    <div style='padding:48px 24px;text-align:center;background:rgba(255,255,255,0.03);
+                border:1px dashed rgba(255,255,255,0.12);border-radius:12px;margin:16px 0;'>
+        <div style='font-size:52px;margin-bottom:14px;'>{icon}</div>
+        <h3 style='color:#cccccc;margin:0 0 8px 0;font-weight:600;'>{title}</h3>
+        <p style='color:#888888;margin:0;font-size:15px;'>{message}</p>
+        {action_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def _api_unavailable_state(feature: str) -> None:
+    """Render a stylized warning when Gemini API key is missing."""
+    st.markdown(f"""
+    <div style='padding:20px 24px;background:rgba(255,153,0,0.08);
+                border-left:4px solid #ff9900;border-radius:8px;margin:16px 0;'>
+        <h4 style='color:#ff9900;margin:0 0 6px 0;'>⚙️ API Key Required</h4>
+        <p style='color:#ccc;margin:0;font-size:14px;'>
+            <strong>{feature}</strong> requires a <code>GEMINI_API_KEY</code> in your
+            <code>.env</code> file. Add it to unlock AI-powered analysis.
+            A rule-based fallback is active in the meantime.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ===========================
 # PAGE CONFIGURATION
@@ -155,8 +193,8 @@ def generate_bluf_narrative(db_stats: Dict, signals: List[Dict]) -> str:
     critical_df = df[df['disruption_classification'] == 'CRITICAL'].sort_values('impact_score', ascending=False)
     top_threat = critical_df.iloc[0]['title'] if len(critical_df) > 0 else None
 
-    # If no API key, use intelligent rule-based fallback
-    if not api_key:
+    # If no API key or Gemini not installed, use intelligent rule-based fallback
+    if not api_key or not GEMINI_AVAILABLE:
         # Sentence 1: Overall status and volume
         sentence1 = f"Currently tracking {db_stats['total_signals']} disruption signals with {critical_count} CRITICAL and {high_count} HIGH priority threats demanding immediate attention."
 
@@ -181,11 +219,11 @@ def generate_bluf_narrative(db_stats: Dict, signals: List[Dict]) -> str:
 
         return f"{sentence1} {sentence2} {sentence3}"
 
-    # If API key available, use Claude for more sophisticated analysis
+    # If API key available and Gemini installed, use AI for sophisticated analysis
     avg_impact = df['impact_score'].mean() if 'impact_score' in df.columns else 0
     avg_novelty = df['novelty_score'].mean() if 'novelty_score' in df.columns else 0
 
-    # Build context for Claude
+    # Build context for Gemini
     context = f"""
 DATABASE STATISTICS:
 - Total Signals: {db_stats['total_signals']}
@@ -246,8 +284,14 @@ def generate_strategic_questions(critical_signals: List[Dict]) -> List[str]:
     Returns:
         List of strategic questions
     """
-    # Get API key from environment
     api_key = get_api_key()
+
+    if not api_key or not GEMINI_AVAILABLE:
+        return [
+            "If EU electrification mandates accelerate to 2027, which Fendt R&D programs face obsolescence?",
+            "Which competitor is closest to commercializing autonomous precision farming, and what is Fendt's countermove?",
+            "How does the CAP subsidy reallocation toward sustainability affect Fendt's core diesel tractor revenue?",
+        ]
 
     # Prepare signal context
     signal_summaries = []
@@ -334,10 +378,15 @@ else:
     st.sidebar.info("Run the daily intelligence sweep to populate data.")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("**PESTEL Breakdown**")
+st.sidebar.markdown("**PESTEL-EL Breakdown**")
 if stats['signals_per_dimension']:
     for dim, count in stats['signals_per_dimension'].items():
-        st.sidebar.caption(f"{dim}: {count}")
+        color = PESTEL_COLORS.get(dim, '#999999')
+        st.sidebar.markdown(
+            f"<span style='color:{color};font-size:16px;'>●</span> "
+            f"<span style='font-size:13px;'><b>{dim}</b>: {count}</span>",
+            unsafe_allow_html=True
+        )
 
 # Load signals
 signals = load_all_signals()
@@ -363,7 +412,11 @@ with tab1:
     st.subheader("Executive Summary")
 
     if not signals:
-        st.info("No signals available. Database is empty. Run the daily intelligence sweep.")
+        _empty_state(
+            "📡", "Intelligence Database Empty",
+            "No disruption signals have been ingested yet.",
+            "Run the daily intelligence sweep to populate the radar: <code>python sentinel.py --run-once</code>"
+        )
     else:
         # ===========================
         # BLUF AI EXECUTIVE NARRATIVE
@@ -390,7 +443,10 @@ with tab1:
             unsafe_allow_html=True
         )
 
-        st.caption("ℹ️ **AI-Generated Synthesis:** This narrative is dynamically generated by Gemini analyzing database statistics, PESTEL distribution, severity breakdown, and mathematical disruption scores. It provides a non-technical executive summary of the current threat landscape.")
+        if not get_api_key() or not GEMINI_AVAILABLE:
+            _api_unavailable_state("BLUF AI Executive Narrative")
+        else:
+            st.caption("ℹ️ **AI-Generated Synthesis:** Dynamically generated by Gemini analyzing PESTEL distribution, severity breakdown, and mathematical disruption scores.")
 
         st.markdown("---")
 
@@ -531,7 +587,11 @@ with tab2:
     st.subheader("Innovation Radar - Industry Disruption Map")
 
     if not signals:
-        st.info("No signals available. Run the daily intelligence sweep to populate the radar.")
+        _empty_state(
+            "🎯", "Radar Awaiting Data",
+            "No signals available to plot on the disruption radar.",
+            "Run the daily intelligence sweep to populate the radar: <code>python sentinel.py --run-once</code>"
+        )
     else:
         st.markdown("""
         **Time Horizons:**
@@ -539,7 +599,7 @@ with tab2:
         - 🟡 **24 Month**: Pilot and trial phase
         - 🟢 **36 Month**: Assess and monitor
 
-        **Quadrants**: PESTEL dimensions (Political, Economic, Social, Technological, Environmental, Legal)
+        **Sectors** (8 PESTEL-EL pillars): Political · Economic · Social · Technological · Environmental · Legal · Innovation · Social Media
         """)
 
         # Dimension filter widget
@@ -603,7 +663,11 @@ with tab3:
     st.subheader("Live Signal Feed - All Data")
 
     if not signals:
-        st.info("No signals in database. Run the daily intelligence sweep.")
+        _empty_state(
+            "📡", "Signal Feed Empty",
+            "No disruption signals have been ingested yet.",
+            "Run the daily intelligence sweep: <code>python sentinel.py --run-once</code>"
+        )
     else:
         df = pd.DataFrame(signals)
 
@@ -694,7 +758,11 @@ with tab4:
     st.caption("**Engage in strategic dialogue with Claude. Ask follow-up questions, challenge assumptions, and explore alternative scenarios based on current disruption intelligence.**")
 
     if not signals:
-        st.info("No signals available. Run the daily intelligence sweep first.")
+        _empty_state(
+            "⚔️", "The Inquisition Awaits Intelligence",
+            "No signals available. The Inquisition requires live disruption data to interrogate.",
+            "Run the daily intelligence sweep first: <code>python sentinel.py --run-once</code>"
+        )
     else:
         df = pd.DataFrame(signals)
         # Accept both CRITICAL and HIGH signals for analysis
@@ -715,8 +783,15 @@ with tab4:
             if 'inquisition_initialized' not in st.session_state:
                 st.session_state.inquisition_initialized = False
 
-            # Initialize conversation with strategic questions
-            if st.button("🔮 Start New Strategic Session", type="primary") or not st.session_state.inquisition_initialized:
+            # Show awaiting state on first load — only fire on explicit button click
+            if not st.session_state.inquisition_initialized:
+                _empty_state(
+                    "🔮", "Ready to Interrogate",
+                    "Click the button above to generate hard-hitting strategic questions from your live intelligence data.",
+                    "The Inquisition analyzes your CRITICAL and HIGH signals and forces C-suite reflection."
+                )
+
+            if st.button("🔮 Start New Strategic Session", type="primary"):
                 with st.spinner("Consulting Claude for strategic insights..."):
                     questions = generate_strategic_questions(high_priority_signals)
 
@@ -834,8 +909,11 @@ with tab5:
     graph_path = Path('./data/graph.json')
 
     if not graph_path.exists():
-        st.warning("⚠️ Knowledge Graph not yet initialized. No causal relationships have been mapped.")
-        st.info("The Graph is populated by the Analyst agents during the intelligence pipeline execution.")
+        _empty_state(
+            "🕸️", "Knowledge Graph Not Yet Initialized",
+            "No causal relationships have been mapped between PESTEL entities.",
+            "The Graph is populated by the Analyst agents during pipeline execution: <code>python sentinel.py --run-once</code>"
+        )
     else:
         try:
             import json
@@ -975,14 +1053,7 @@ with tab5:
                     damping=0.5
                 )
 
-                category_colors = {
-                    'POLITICAL': '#e41a1c',
-                    'ECONOMIC': '#377eb8',
-                    'SOCIAL': '#4daf4a',
-                    'TECHNOLOGICAL': '#984ea3',
-                    'ENVIRONMENTAL': '#ff7f00',
-                    'LEGAL': '#ffff33'
-                }
+                category_colors = PESTEL_COLORS  # Single source of truth from innovation_radar.py
 
                 visible_nodes = set()
                 for node_id, attrs in G.nodes(data=True):
@@ -1077,56 +1148,57 @@ with tab6:
 
     st.caption("**The Writer agent generates executive-ready strategic briefs in Markdown format. These reports synthesize disruption signals into actionable R&D recommendations.**")
 
-    reports_dir = Path('./outputs/reports')
+    # Search multiple report directories to avoid data-island issues
+    report_dirs = [Path('./outputs/reports'), Path('./q2_solution/outputs/reports')]
+    all_report_files = []
+    for d in report_dirs:
+        if d.exists():
+            all_report_files.extend(list(d.glob('*.md')))
 
-    if not reports_dir.exists() or not any(reports_dir.glob('*.md')):
-        st.warning("⚠️ No strategic reports found.")
-        st.info("Reports are automatically generated by the Writer agent during pipeline execution. Check `outputs/reports/` directory.")
-
-        if reports_dir.exists():
-            st.code(f"Report directory exists but is empty: {reports_dir}")
-        else:
-            st.code(f"Report directory not created yet: {reports_dir}")
+    if not all_report_files:
+        _empty_state(
+            "📄", "No Strategic Reports Generated Yet",
+            "Reports are automatically produced by the Writer agent during pipeline execution.",
+            f"Run <code>python sentinel.py --run-once</code> to generate."
+        )
     else:
-        report_files = sorted(reports_dir.glob('*.md'), key=lambda x: x.stat().st_mtime, reverse=True)
+        report_files = sorted(all_report_files, key=lambda x: x.stat().st_mtime, reverse=True)
 
-        if report_files:
-            report_names = [f.name for f in report_files]
-            selected_report = st.selectbox(
-                "📋 Select Report to View",
-                options=report_names,
-                help="Reports are sorted by modification time (newest first)"
-            )
+        report_names = [f.name for f in report_files]
+        selected_report = st.selectbox(
+            "📋 Select Report to View",
+            options=report_names,
+            help="Reports are sorted by modification time (newest first)"
+        )
 
-            selected_file = reports_dir / selected_report
+        # Find the actual file object by name
+        selected_file = next(f for f in report_files if f.name == selected_report)
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.caption(f"**File:** {selected_report}")
-            with col2:
-                mod_time = datetime.fromtimestamp(selected_file.stat().st_mtime)
-                st.caption(f"**Last Modified:** {mod_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.caption(f"**File:** {selected_report}")
+        with col2:
+            mod_time = datetime.fromtimestamp(selected_file.stat().st_mtime)
+            st.caption(f"**Last Modified:** {mod_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+        st.markdown("---")
+
+        try:
+            with open(selected_file, 'r', encoding='utf-8') as f:
+                report_content = f.read()
+
+            st.markdown(report_content, unsafe_allow_html=True)
 
             st.markdown("---")
+            st.download_button(
+                label="📥 Download Report as Markdown",
+                data=report_content,
+                file_name=selected_report,
+                mime="text/markdown"
+            )
 
-            try:
-                with open(selected_file, 'r', encoding='utf-8') as f:
-                    report_content = f.read()
-
-                st.markdown(report_content, unsafe_allow_html=True)
-
-                st.markdown("---")
-                st.download_button(
-                    label="📥 Download Report as Markdown",
-                    data=report_content,
-                    file_name=selected_report,
-                    mime="text/markdown"
-                )
-
-            except Exception as e:
-                st.error(f"Error reading report: {str(e)}")
-        else:
-            st.warning("No markdown reports found in outputs/reports/")
+        except Exception as e:
+            st.error(f"Error reading report: {str(e)}")
 
 # ===========================
 # FOOTER

@@ -99,9 +99,25 @@ class DisruptionScorer:
             'scored_at': datetime.now().isoformat()
         }
 
+    def _build_signal_fingerprint(self, signal: Dict) -> str:
+        """
+        Build a comparable text fingerprint from title + content keywords.
+
+        Combining title with key content terms catches rephrased duplicates
+        that differ in title wording but share the same substantive themes.
+        """
+        title = signal.get('title', '')
+        content = signal.get('content', '')
+        # Use first 300 chars of content to capture dominant themes without noise
+        content_excerpt = content[:300] if content else ''
+        return f"{title} {content_excerpt}".lower()
+
     def _calculate_novelty(self, signal: Dict) -> float:
         """
         Calculate how novel this signal is vs. historical signals.
+
+        Compares a fingerprint of title + content excerpt against history
+        so that rephrased duplicates with different titles score low novelty.
 
         High novelty = emerging disruption
         Low novelty = mainstream trend
@@ -112,19 +128,16 @@ class DisruptionScorer:
         if not self.historical_signals:
             return 0.8  # Default high novelty if no history
 
-        title = signal.get('title', '')
+        signal_fingerprint = self._build_signal_fingerprint(signal)
         max_similarity = 0.0
 
-        # Compare against historical signal titles
         for hist_signal in self.historical_signals:
-            hist_title = hist_signal.get('title', '')
-            similarity = SequenceMatcher(None, title.lower(), hist_title.lower()).ratio()
+            hist_fingerprint = self._build_signal_fingerprint(hist_signal)
+            similarity = SequenceMatcher(None, signal_fingerprint, hist_fingerprint).ratio()
             max_similarity = max(max_similarity, similarity)
 
         # Novelty = inverse of similarity
-        novelty = 1.0 - max_similarity
-
-        return novelty
+        return 1.0 - max_similarity
 
     def _calculate_impact(self, signal: Dict) -> float:
         """

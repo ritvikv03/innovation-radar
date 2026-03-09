@@ -2,10 +2,18 @@
 Signal Classifier for Q2 - Industry Disruption Detection
 =========================================================
 
-Classifies raw signals into PESTEL dimensions using keyword matching and TF-IDF.
+Classifies raw signals into PESTEL-EL dimensions using keyword matching.
 
 Input: Raw signal data (title, content, source)
-Output: Classified signal with PESTEL tags, entities, temporal metadata
+Output: Classified signal with PESTEL-EL tags, entities, temporal metadata
+
+Dimensions (8 pillars per CLAUDE.md):
+  POLITICAL, ECONOMIC, SOCIAL, TECHNOLOGICAL, ENVIRONMENTAL, LEGAL,
+  INNOVATION, SOCIAL_MEDIA
+
+Tie-breaking priority (highest C-suite urgency first):
+  LEGAL > ENVIRONMENTAL > TECHNOLOGICAL > ECONOMIC > POLITICAL > SOCIAL
+  > INNOVATION > SOCIAL_MEDIA
 """
 
 import re
@@ -14,7 +22,7 @@ from typing import Dict, List, Tuple
 from collections import Counter
 
 
-# PESTEL Dimension Keyword Dictionaries
+# PESTEL-EL Dimension Keyword Dictionaries (8 pillars)
 PESTEL_KEYWORDS = {
     'POLITICAL': [
         'policy', 'election', 'government', 'trade', 'tariff', 'subsidy',
@@ -32,9 +40,10 @@ PESTEL_KEYWORDS = {
         'education', 'health', 'safety', 'social', 'cultural'
     ],
     'TECHNOLOGICAL': [
-        'innovation', 'digital', 'automation', 'AI', 'robotics',
-        'sensor', 'IoT', 'software', 'patent', 'R&D', 'research',
-        'technology', 'algorithm', 'data', 'connectivity', 'precision'
+        'digital', 'automation', 'AI', 'robotics',
+        'sensor', 'IoT', 'software', 'R&D', 'research',
+        'technology', 'algorithm', 'data', 'connectivity', 'precision',
+        'autonomous', 'electric', 'hydrogen', 'telematics'
     ],
     'ENVIRONMENTAL': [
         'climate', 'emission', 'carbon', 'sustainability', 'weather',
@@ -45,8 +54,26 @@ PESTEL_KEYWORDS = {
         'regulation', 'law', 'directive', 'compliance', 'standard',
         'certification', 'ban', 'mandate', 'enforcement', 'penalty',
         'legal', 'court', 'ruling', 'obligation', 'requirement'
+    ],
+    'INNOVATION': [
+        'product launch', 'new model', 'market entry', 'commercial release',
+        'concept machine', 'prototype', 'startup', 'funding round',
+        'acquisition', 'joint venture', 'spin-off', 'technology transfer',
+        'Agritechnica', 'SIMA', 'Farm Progress Show', 'dealer launch',
+        'production ready', 'series production', 'unveil', 'debut'
+    ],
+    'SOCIAL_MEDIA': [
+        'viral', 'influencer', 'hashtag', 'trending', 'social media',
+        'tiktok', 'youtube', 'instagram', 'online discussion', 'buzz',
+        'sentiment online', 'digital community', 'forum', 'reddit', 'twitter'
     ]
 }
+
+# Tie-breaking priority: index 0 = highest priority
+TIE_BREAK_PRIORITY = [
+    'LEGAL', 'ENVIRONMENTAL', 'TECHNOLOGICAL', 'ECONOMIC',
+    'POLITICAL', 'SOCIAL', 'INNOVATION', 'SOCIAL_MEDIA'
+]
 
 
 class SignalClassifier:
@@ -77,10 +104,12 @@ class SignalClassifier:
             score = sum(1 for keyword in keywords if keyword.lower() in combined_text)
             dimension_scores[dimension] = score
 
-        # Primary dimension (highest score)
-        primary_dimension = max(dimension_scores, key=dimension_scores.get)
+        # Primary dimension: highest score; ties broken by TIE_BREAK_PRIORITY
+        max_score = max(dimension_scores.values())
+        top_dims = [d for d, s in dimension_scores.items() if s == max_score]
+        primary_dimension = min(top_dims, key=lambda d: TIE_BREAK_PRIORITY.index(d))
 
-        # Secondary dimensions (score > 2)
+        # Secondary dimensions (score >= 2)
         secondary_dimensions = [
             dim for dim, score in dimension_scores.items()
             if score >= 2 and dim != primary_dimension
@@ -165,15 +194,20 @@ class SignalClassifier:
             'urgency': 'MEDIUM'
         }
 
-        # Extract years (2024, 2025, 2026, 2027)
+        # Extract years (2024–2035)
         year_matches = re.findall(r'\b(202[4-9]|203[0-5])\b', text)
         temporal['mentioned_years'] = sorted(list(set(year_matches)))
 
-        # Detect time horizon keywords
-        if any(keyword in text for keyword in ['2024', '2025', 'immediate', 'urgent', 'now']):
+        # Dynamic urgency: HIGH = current or next year, MEDIUM = +2/+3 years, LOW = further
+        current_year = datetime.now().year
+        high_years = {str(current_year), str(current_year + 1)}
+        medium_years = {str(current_year + 2), str(current_year + 3)}
+
+        mentioned_set = set(temporal['mentioned_years'])
+        if mentioned_set & high_years or any(kw in text for kw in ['immediate', 'urgent', 'now']):
             temporal['time_horizon'] = '12_MONTH'
             temporal['urgency'] = 'HIGH'
-        elif any(keyword in text for keyword in ['2026', '2027', 'upcoming', 'near future']):
+        elif mentioned_set & medium_years or any(kw in text for kw in ['upcoming', 'near future']):
             temporal['time_horizon'] = '24_MONTH'
             temporal['urgency'] = 'MEDIUM'
         else:

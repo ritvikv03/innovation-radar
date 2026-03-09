@@ -14,6 +14,19 @@ import math
 from typing import List, Dict
 import json
 
+# Single source of truth for all PESTEL-EL dimension colors.
+# Import this in dashboard.py to keep Knowledge Graph, radar, and sidebar in sync.
+PESTEL_COLORS = {
+    'POLITICAL':     '#e41a1c',
+    'ECONOMIC':      '#377eb8',
+    'SOCIAL':        '#4daf4a',
+    'TECHNOLOGICAL': '#984ea3',
+    'ENVIRONMENTAL': '#ff7f00',
+    'LEGAL':         '#ffff33',
+    'INNOVATION':    '#00ccff',
+    'SOCIAL_MEDIA':  '#ff69b4',
+}
+
 
 class InnovationRadar:
     """
@@ -27,13 +40,11 @@ class InnovationRadar:
             '36_MONTH': {'radius': 0.33, 'label': '36 Month', 'color': '#1a9850'}
         }
 
+        # 8 PESTEL-EL pillars at 45° each (360° / 8). Colors from PESTEL_COLORS.
+        _angles = [0, 45, 90, 135, 180, 225, 270, 315]
         self.quadrants = {
-            'POLITICAL': {'angle_start': 0, 'angle_end': 60, 'color': '#e41a1c'},
-            'ECONOMIC': {'angle_start': 60, 'angle_end': 120, 'color': '#377eb8'},
-            'SOCIAL': {'angle_start': 120, 'angle_end': 180, 'color': '#4daf4a'},
-            'TECHNOLOGICAL': {'angle_start': 180, 'angle_end': 240, 'color': '#984ea3'},
-            'ENVIRONMENTAL': {'angle_start': 240, 'angle_end': 300, 'color': '#ff7f00'},
-            'LEGAL': {'angle_start': 300, 'angle_end': 360, 'color': '#ffff33'}
+            dim: {'angle_start': _angles[i], 'angle_end': _angles[i] + 45, 'color': PESTEL_COLORS[dim]}
+            for i, dim in enumerate(PESTEL_COLORS)
         }
 
     def create_radar(self, signals: List[Dict], title: str = "European Agriculture Industry Disruption Radar") -> go.Figure:
@@ -160,9 +171,10 @@ class InnovationRadar:
                     gridcolor='rgba(255, 255, 255, 0.1)'
                 ),
                 angularaxis=dict(
-                    tickvals=[30, 90, 150, 210, 270, 330],
+                    tickvals=[22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5],
                     ticktext=['<b>POLITICAL</b>', '<b>ECONOMIC</b>', '<b>SOCIAL</b>',
-                             '<b>TECHNOLOGICAL</b>', '<b>ENVIRONMENTAL</b>', '<b>LEGAL</b>'],
+                             '<b>TECHNOLOGICAL</b>', '<b>ENVIRONMENTAL</b>', '<b>LEGAL</b>',
+                             '<b>INNOVATION</b>', '<b>SOCIAL MEDIA</b>'],
                     tickfont=dict(size=14, family='Arial Black', color='#00ccff'),
                     direction='clockwise',
                     gridcolor='rgba(0, 204, 255, 0.2)'
