@@ -227,7 +227,7 @@ The target state resolves all five critical defects with minimal new code:
 │  state.py (session state management)                            │
 │  ai_client.py (LLM abstraction — swap Gemini ↔ Claude)         │
 └─────────────────────────────────────────────────────────────────┘
-```
+````
 
 ### Key Architectural Decisions
 

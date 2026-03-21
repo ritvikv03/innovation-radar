@@ -51,16 +51,14 @@ except ImportError:
     from q2_solution.database import SignalDatabase
 
 try:
-    from use_case_1_etractor import ETractorIntelligence
     from semantic_search import SemanticSearch
-    ETRACTOR_AVAILABLE = True
+    SEMANTIC_SEARCH_AVAILABLE = True
 except ImportError:
     try:
-        from q2_solution.use_case_1_etractor import ETractorIntelligence
         from q2_solution.semantic_search import SemanticSearch
-        ETRACTOR_AVAILABLE = True
+        SEMANTIC_SEARCH_AVAILABLE = True
     except ImportError:
-        ETRACTOR_AVAILABLE = False
+        SEMANTIC_SEARCH_AVAILABLE = False
 
 try:
     from innovation_radar import InnovationRadar, PESTEL_COLORS
@@ -89,49 +87,44 @@ def get_api_key() -> str:
     return os.getenv("GEMINI_API_KEY", "")
 
 
-@st.cache_data(ttl=1800)  # Re-check every 30 minutes
-def check_gemini_health() -> tuple:
+def _get_gemini_model():
     """
-    Probe the Gemini API once and cache the result for 30 minutes.
+    Return a configured GenerativeModel or None.
 
-    Returns:
-        (is_healthy: bool, model_name: str, status_msg: str)
+    ZERO probe calls — no API call is made here.
+    Quota failures recorded in session state are respected across the entire session.
     """
+    if st.session_state.get('_gemini_quota_hit'):
+        return None
     api_key = get_api_key()
     if not api_key or not GEMINI_AVAILABLE:
-        return False, "", "No API key configured"
-
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        for model_name in _GEMINI_MODELS:
-            try:
-                model = genai.GenerativeModel(model_name)
-                resp = model.generate_content(
-                    "Reply with exactly two words: STATUS OK",
-                    generation_config={"max_output_tokens": 10},
-                )
-                if resp.text:
-                    return True, model_name, f"OK ({model_name})"
-            except Exception as e:
-                err = str(e)
-                if "429" in err or "quota" in err.lower() or "RESOURCE_EXHAUSTED" in err:
-                    return False, "", "Daily quota exhausted — rule-based fallback active"
-                # Other error: try next model
-                continue
-        return False, "", "All Gemini models unavailable"
-    except Exception as e:
-        return False, "", f"Gemini error: {str(e)[:80]}"
-
-
-def _get_gemini_model():
-    """Return a ready GenerativeModel using the healthiest available model, or None."""
-    healthy, model_name, _ = check_gemini_health()
-    if not healthy:
         return None
     import google.generativeai as genai
-    genai.configure(api_key=get_api_key())
-    return genai.GenerativeModel(model_name)
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel(_GEMINI_MODELS[0])
+
+
+def _call_gemini(model, prompt: str, max_tokens: int = 400) -> str | None:
+    """
+    Call Gemini and return response text, or None on any failure.
+
+    Catches quota / rate-limit errors and stores them in session state so
+    all subsequent calls in the same session skip the API (zero extra quota usage).
+    """
+    try:
+        resp = model.generate_content(
+            prompt, generation_config={"max_output_tokens": max_tokens}
+        )
+        st.session_state['_gemini_status'] = f"OK ({model.model_name})"
+        return resp.text.strip()
+    except Exception as e:
+        err = str(e)
+        if "429" in err or "quota" in err.lower() or "RESOURCE_EXHAUSTED" in err:
+            st.session_state['_gemini_quota_hit'] = True
+            st.session_state['_gemini_status'] = "Daily quota exhausted — rule-based fallback active"
+        else:
+            st.session_state['_gemini_status'] = f"Gemini error: {err[:80]}"
+        return None
 
 
 def _empty_state(icon: str, title: str, message: str, action: str = "") -> None:
@@ -153,7 +146,7 @@ def _empty_state(icon: str, title: str, message: str, action: str = "") -> None:
 
 def _api_unavailable_state(feature: str) -> None:
     """Render a stylized warning when Gemini API is unavailable (missing key or quota)."""
-    _, _, status_msg = check_gemini_health()
+    status_msg = st.session_state.get('_gemini_status', '')
     is_quota = "quota" in status_msg.lower() or "exhausted" in status_msg.lower()
     icon = "⏳" if is_quota else "⚙️"
     detail = (
@@ -168,7 +161,7 @@ def _api_unavailable_state(feature: str) -> None:
                 border-left:4px solid #ff9900;border-radius:8px;margin:12px 0;'>
         <h4 style='color:#ff9900;margin:0 0 4px 0;'>{icon} AI Fallback Mode — {feature}</h4>
         <p style='color:#ccc;margin:0;font-size:13px;'>{detail}</p>
-        <p style='color:#888;margin:4px 0 0 0;font-size:12px;'>Status: {status_msg}</p>
+        {f"<p style='color:#888;margin:4px 0 0 0;font-size:12px;'>Status: {status_msg}</p>" if status_msg else ""}
     </div>
     """, unsafe_allow_html=True)
 
@@ -331,14 +324,9 @@ TOP CRITICAL THREAT: {top_threat}"""
         f"{context}"
     )
 
-    try:
-        response = gemini_model.generate_content(
-            prompt, generation_config={"max_output_tokens": 300}
-        )
-        return response.text.strip()
-    except Exception:
-        # Fall through to rule-based on any error
-        pass
+    ai_text = _call_gemini(gemini_model, prompt, max_tokens=300)
+    if ai_text:
+        return ai_text
 
     # Fallback if AI call fails mid-flight
     return (
@@ -387,20 +375,17 @@ def generate_strategic_questions(critical_signals: List[Dict]) -> List[str]:
         f"SIGNALS:\n{signal_summaries}"
     )
 
-    try:
-        response = gemini_model.generate_content(
-            prompt, generation_config={"max_output_tokens": 400}
-        )
+    ai_text = _call_gemini(gemini_model, prompt, max_tokens=400)
+    if ai_text:
         questions = []
-        for line in response.text.strip().split('\n'):
+        for line in ai_text.split('\n'):
             line = line.strip()
             if line and (line[0].isdigit() or line.startswith('-')):
                 q = line.lstrip('0123456789.-) *').strip()
                 if q:
                     questions.append(q)
         return questions if questions else _fallback_questions
-    except Exception:
-        return _fallback_questions
+    return _fallback_questions
 
 # ===========================
 # MAIN DASHBOARD
@@ -430,10 +415,19 @@ else:
 
 st.sidebar.markdown("---")
 
-# Gemini API health status
-_g_healthy, _g_model, _g_status = check_gemini_health()
-_g_color = "#00ff88" if _g_healthy else "#ff9933"
-_g_icon = "🟢" if _g_healthy else "🟡"
+# Gemini API status — read from session state only (no probe calls, no quota usage)
+_quota_hit = st.session_state.get('_gemini_quota_hit', False)
+_has_key = bool(get_api_key()) and GEMINI_AVAILABLE
+if _quota_hit:
+    _g_color, _g_icon, _g_status = "#ff9933", "🟡", "Quota exhausted — fallback active"
+elif _has_key:
+    _g_status_stored = st.session_state.get('_gemini_status', '')
+    if _g_status_stored.startswith("OK"):
+        _g_color, _g_icon, _g_status = "#00ff88", "🟢", _g_status_stored
+    else:
+        _g_color, _g_icon, _g_status = "#00ccff", "🔵", "Ready (on-demand)"
+else:
+    _g_color, _g_icon, _g_status = "#888888", "⚫", "No API key"
 st.sidebar.markdown(
     f"<span style='font-size:12px;color:{_g_color};'>{_g_icon} AI: {_g_status}</span>",
     unsafe_allow_html=True,
@@ -464,7 +458,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "⚔️ The Inquisition",
     "🕸️ Knowledge Graph",
     "📄 Strategic Reports",
-    "🔋 E-Tractor Intelligence",
+    "📐 Strategic Intelligence Lens",
 ])
 
 # ===========================
@@ -1045,7 +1039,7 @@ with tab4:
                     with st.spinner("Generating strategic analysis..."):
                         inq_model = _get_gemini_model()
                         if not inq_model:
-                            _, _, status = check_gemini_health()
+                            status = st.session_state.get('_gemini_status', 'No API key configured')
                             st.warning(
                                 f"AI unavailable ({status}). The Inquisition requires Gemini to respond. "
                                 "Please try again after midnight UTC when the quota resets, "
@@ -1067,16 +1061,15 @@ with tab4:
                                     chat_context += f"{msg['role'].upper()}: {msg['content']}\n\n"
                                 chat_context += f"USER: {prompt}\n\nRespond strategically:"
 
-                                response = inq_model.generate_content(
-                                    chat_context,
-                                    generation_config={"max_output_tokens": 600},
-                                )
-                                full_response = response.text
-                                st.markdown(full_response)
-                                st.session_state.inquisition_messages.append({
-                                    "role": "assistant",
-                                    "content": full_response,
-                                })
+                                full_response = _call_gemini(inq_model, chat_context, max_tokens=600)
+                                if full_response:
+                                    st.markdown(full_response)
+                                    st.session_state.inquisition_messages.append({
+                                        "role": "assistant",
+                                        "content": full_response,
+                                    })
+                                else:
+                                    st.warning("AI response unavailable — quota may be exhausted.")
                             except Exception as e:
                                 st.error(f"Error: {str(e)[:200]}")
 
@@ -1572,164 +1565,206 @@ PRIORITY_BADGE = {
 
 with tab7:
     st.markdown("""
-    <div style='text-align: center; padding: 15px; background: rgba(0,180,80,0.1); border-left: 4px solid #00cc55; border-radius: 5px; margin-bottom: 20px;'>
-        <h2 style='color: #00cc55; margin: 0;'>🔋 Use Case 1: Electric Tractor Intelligence</h2>
-        <p style='color: #ccc; margin: 5px 0 0 0;'>Subsidies · Business Impact · Sales & Marketing Recommendations · Customer Needs</p>
+    <div style='text-align: center; padding: 15px; background: rgba(0,140,255,0.1); border-left: 4px solid #00ccff; border-radius: 5px; margin-bottom: 20px;'>
+        <h2 style='color: #00ccff; margin: 0;'>📐 Strategic Intelligence Lens</h2>
+        <p style='color: #ccc; margin: 5px 0 0 0;'>Deep-dive any strategic topic — powered by semantic search over the live signal database</p>
     </div>
     """, unsafe_allow_html=True)
 
-    if not ETRACTOR_AVAILABLE:
+    st.markdown("""
+    <div style='padding: 12px 16px; background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 18px; border: 1px solid rgba(255,255,255,0.08);'>
+        <p style='color: #aaaaaa; margin: 0; font-size: 14px;'>
+        Select a preset strategic lens or define your own topic. The engine performs semantic search across
+        the live intelligence database — no synthetic data, no hardcoded knowledge bases.
+        Every result links back to a verified source signal.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if not SEMANTIC_SEARCH_AVAILABLE:
         _empty_state(
-            "🔋", "E-Tractor Module Unavailable",
-            "use_case_1_etractor.py or semantic_search.py not found.",
-            "Ensure both files are in the q2_solution/ directory."
+            "📐", "Semantic Search Unavailable",
+            "semantic_search.py not found in q2_solution/.",
+            "Ensure the file exists and scikit-learn is installed."
+        )
+    elif not signals:
+        _empty_state(
+            "📡", "No Signals in Database",
+            "Run the daily intelligence sweep first to populate the database.",
+            "python sentinel.py --run-once"
         )
     else:
-        etractor = ETractorIntelligence()
-        searcher = SemanticSearch()
-        searcher.build_index(signals)
+        # ── Build search index ───────────────────────────────────────────
+        if 'lens_searcher' not in st.session_state:
+            _s = SemanticSearch()
+            _s.build_index(signals)
+            st.session_state['lens_searcher'] = _s
+        searcher = st.session_state['lens_searcher']
 
-        # ── Overview metrics ────────────────────────────────────────────
-        impact = etractor.generate_business_impact(signals)
-        relevant_signals = etractor.get_relevant_signals(signals)
-        competitor_signals = etractor.get_competitor_signals(signals)
+        import plotly.graph_objects as go
 
-        risk_color = {'HIGH': '#ff0066', 'MODERATE': '#ff9933', 'LOW': '#00ff88'}.get(
-            impact['overall_risk_level'], '#999'
-        )
+        # ── Preset lenses + custom input ────────────────────────────────
+        PRESET_LENSES = {
+            "🔋 Electric Tractor Adoption": "electric tractor battery subsidy incentive adoption charging infrastructure",
+            "🌿 CAP Reform & Green Deal": "CAP reform EU Green Deal sustainability subsidy reallocation biodiversity",
+            "🤖 Precision Farming & Automation": "precision farming autonomous tractor AI robotics GPS sensor automation",
+            "🏭 Competitor Intelligence": "John Deere CNH Claas Kubota AGCO competitor product launch patent",
+            "📜 Regulatory Compliance": "EU regulation directive compliance mandate emission standard pesticide restriction",
+            "💶 Farm Profitability & Subsidies": "farm profitability income subsidy commodity price input cost margin",
+            "🌡️ Climate & Weather Risk": "drought flood extreme weather climate change crop yield impact",
+            "🔬 AgTech R&D & Innovation": "innovation R&D investment startup funding agtech digital technology patent",
+            "✏️ Custom Topic…": "__custom__",
+        }
 
-        col_r1, col_r2, col_r3, col_r4 = st.columns(4)
-        with col_r1:
-            st.metric(
-                "🔋 E-Tractor Signals", impact['total_relevant_signals'],
-                help="Signals in the database that contain electric tractor, battery, subsidy, or related keywords."
+        lens_col, top_k_col = st.columns([4, 1])
+        with lens_col:
+            selected_lens = st.selectbox(
+                "🔎 Select Strategic Lens",
+                options=list(PRESET_LENSES.keys()),
+                help="Choose a preset strategic topic or define your own custom search query."
             )
-        with col_r2:
-            st.metric(
-                "🔴 Critical / High", impact['critical_high_count'],
-                help="Subset classified as CRITICAL or HIGH severity — requiring immediate strategic attention."
+        with top_k_col:
+            top_k = st.number_input("Max results", min_value=3, max_value=30, value=10, step=1)
+
+        # Custom query input
+        if PRESET_LENSES[selected_lens] == "__custom__":
+            custom_query = st.text_input(
+                "✏️ Enter custom topic or question",
+                placeholder="e.g. hydrogen fuel cell tractor EU pilot programs 2026–2028",
+                help="Free-form query — the engine finds signals semantically similar to your text."
             )
-        with col_r3:
-            st.metric(
-                "🏭 Competitor Signals", len(competitor_signals),
-                help="Signals mentioning competitor brands (John Deere, CNH, Claas, Kubota, etc.) in the e-tractor context."
-            )
-        with col_r4:
-            st.metric(
-                "⚡ Avg Impact Score", f"{impact['avg_impact_score']:.2f}",
-                help="Average Impact score (0–1) across e-tractor-relevant signals."
-            )
+            active_query = custom_query
+        else:
+            active_query = PRESET_LENSES[selected_lens]
+            st.caption(f"**Search query:** _{active_query}_")
 
-        st.markdown(
-            f"<div style='padding:10px 14px;background:rgba(255,255,255,0.04);border-radius:6px;"
-            f"border-left:4px solid {risk_color};margin-bottom:18px;'>"
-            f"<b style='color:{risk_color};'>Overall Risk Level: {impact['overall_risk_level']}</b>"
-            f"<span style='color:#888;font-size:13px;'> — based on {impact['critical_high_count']} "
-            f"CRITICAL/HIGH signals out of {impact['total_relevant_signals']} e-tractor-relevant signals detected.</span>"
-            f"</div>",
-            unsafe_allow_html=True
-        )
+        if not active_query:
+            st.info("Enter a custom topic above to begin your analysis.")
+        else:
+            # ── Run semantic search ─────────────────────────────────────
+            with st.spinner("Running semantic search across intelligence database..."):
+                results = searcher.search(active_query, top_k=top_k)
 
-        st.markdown("---")
-
-        # ── Seven sections via expanders ────────────────────────────────
-        section_tabs = st.tabs([
-            "🌍 Subsidy Programs",
-            "📊 Business Impact",
-            "💼 Sales Recommendations",
-            "📣 Marketing Recommendations",
-            "🚜 Customer Needs",
-            "🔍 Semantic Search",
-        ])
-
-        # ── SECTION 1: Subsidy Programs ──────────────────────────────
-        with section_tabs[0]:
-            st.markdown("### Available Subsidy & Incentive Programs")
-            st.caption(
-                "Static knowledge base covering current (2024–2027) programs. "
-                "Amounts and eligibility criteria are indicative — verify with national agricultural agencies before advising customers."
-            )
-
-            country_selected = st.selectbox(
-                "🌍 Select Country / Region",
-                options=etractor.get_all_countries(),
-                help="Select a geography to view applicable subsidy programs for electric tractor adoption."
-            )
-
-            country_data = etractor.get_subsidy_programs(country_selected)
-            st.markdown(
-                f"<div style='padding:10px 14px;background:rgba(0,180,80,0.07);border-radius:6px;"
-                f"border-left:3px solid #00cc55;margin-bottom:14px;'>"
-                f"<p style='color:#aaa;margin:0;font-size:14px;'>{country_data.get('headline', '')}</p>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-
-            for prog in country_data.get('programs', []):
-                rel_color = SEVERITY_COLORS.get(prog['relevance'], '#888')
-                badge = PRIORITY_BADGE.get(prog['relevance'], '⚪')
-                with st.expander(f"{badge} {prog['name']} — {prog['type']}"):
-                    col_a, col_b = st.columns([3, 1])
-                    with col_a:
-                        st.markdown(f"**Description:** {prog['description']}")
-                        st.markdown(f"**Timeline:** {prog['timeline']}")
-                        if prog.get('url'):
-                            st.markdown(f"**Source:** [{prog['url']}]({prog['url']})")
-                    with col_b:
-                        st.markdown(
-                            f"<div style='padding:10px;background:rgba(255,255,255,0.04);border-radius:6px;text-align:center;'>"
-                            f"<p style='color:#888;margin:0;font-size:11px;'>AMOUNT</p>"
-                            f"<p style='color:#e0e0e0;margin:4px 0;font-size:13px;font-weight:bold;'>{prog['amount']}</p>"
-                            f"<p style='color:{rel_color};margin:0;font-size:12px;font-weight:bold;'>{prog['relevance']} RELEVANCE</p>"
-                            f"</div>",
-                            unsafe_allow_html=True
-                        )
-
-            if not country_data.get('programs'):
-                st.info("No subsidy data available for this selection.")
-
-        # ── SECTION 2: Business Impact ───────────────────────────────
-        with section_tabs[1]:
-            st.markdown("### Business Impact Assessment — AGCO/Fendt")
-            st.caption(
-                "Analysis derived from live intelligence signals in the database. "
-                "Refreshes automatically as new signals are ingested."
-            )
-
-            if not relevant_signals:
+            if not results:
                 _empty_state(
-                    "🔋", "No E-Tractor Signals Detected",
-                    "Run the intelligence sweep to populate e-tractor relevant signals.",
-                    "python sentinel.py --run-once"
+                    "🔍", "No Matching Signals",
+                    "No signals in the current database match this topic.",
+                    "Run the intelligence sweep to add more signals: python sentinel.py --run-once"
                 )
             else:
-                # Dimension distribution
-                if impact['dimension_distribution']:
-                    st.markdown("**📊 Signal Distribution by PESTEL Dimension**")
-                    dim_df = pd.DataFrame([
-                        {'Dimension': k, 'Signal Count': v}
-                        for k, v in sorted(impact['dimension_distribution'].items(), key=lambda x: x[1], reverse=True)
-                    ])
-                    import plotly.graph_objects as go
-                    fig_dim = go.Figure(go.Bar(
-                        x=dim_df['Dimension'],
-                        y=dim_df['Signal Count'],
-                        marker_color=[PESTEL_COLORS.get(d, '#999') for d in dim_df['Dimension']],
-                        hovertemplate='<b>%{x}</b>: %{y} signals<extra></extra>'
-                    ))
-                    fig_dim.update_layout(
-                        template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)',
-                        plot_bgcolor='rgba(0,0,0,0)', height=280,
-                        margin=dict(l=0, r=0, t=10, b=0),
-                        yaxis=dict(gridcolor='rgba(255,255,255,0.1)'),
-                        xaxis=dict(gridcolor='rgba(255,255,255,0.05)')
-                    )
-                    st.plotly_chart(fig_dim, use_container_width=True)
+                matched_sigs = [sig for sig, _ in results]
+                match_df = pd.DataFrame(matched_sigs)
 
-                # Top signals table
-                st.markdown("**🔴 Top E-Tractor Signals by Impact**")
-                if impact['top_signals']:
-                    top_df = pd.DataFrame([
+                # ── Summary metrics row ──────────────────────────────────
+                n_critical = sum(1 for s in matched_sigs if s.get('disruption_classification') == 'CRITICAL')
+                n_high = sum(1 for s in matched_sigs if s.get('disruption_classification') == 'HIGH')
+                avg_impact = sum(s.get('impact_score') or 0 for s in matched_sigs) / len(matched_sigs)
+                top_dim = match_df['primary_dimension'].value_counts().idxmax() if 'primary_dimension' in match_df.columns else 'N/A'
+
+                m1, m2, m3, m4 = st.columns(4)
+                with m1:
+                    st.metric("Signals Found", len(results), help="Total signals matching this strategic topic.")
+                with m2:
+                    st.metric("🔴 Critical / High", f"{n_critical} / {n_high}", help="Signals classified as CRITICAL or HIGH severity within this topic.")
+                with m3:
+                    st.metric("Avg Impact", f"{avg_impact:.2f}", help="Average Impact score across matched signals.")
+                with m4:
+                    st.metric("Primary Dimension", top_dim, help="PESTEL dimension with the most signals for this topic.")
+
+                st.markdown("---")
+
+                # ── Two-column layout: chart + signal list ──────────────
+                chart_col, list_col = st.columns([1, 2])
+
+                with chart_col:
+                    # PESTEL dimension breakdown bar chart
+                    if 'primary_dimension' in match_df.columns:
+                        dim_counts = match_df['primary_dimension'].value_counts().reset_index()
+                        dim_counts.columns = ['Dimension', 'Count']
+                        fig_bar = go.Figure(go.Bar(
+                            x=dim_counts['Count'],
+                            y=dim_counts['Dimension'],
+                            orientation='h',
+                            marker_color=[PESTEL_COLORS.get(d, '#999') for d in dim_counts['Dimension']],
+                            hovertemplate='<b>%{y}</b>: %{x} signals<extra></extra>'
+                        ))
+                        fig_bar.update_layout(
+                            template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)',
+                            plot_bgcolor='rgba(0,0,0,0)', height=300,
+                            margin=dict(l=0, r=10, t=10, b=0),
+                            xaxis=dict(gridcolor='rgba(255,255,255,0.1)', title='Signal Count'),
+                            yaxis=dict(gridcolor='rgba(255,255,255,0.05)'),
+                            title=dict(text='PESTEL Distribution', font=dict(color='#aaa', size=13), x=0)
+                        )
+                        st.plotly_chart(fig_bar, use_container_width=True)
+
+                    # Severity breakdown donut
+                    sev_counts = match_df['disruption_classification'].value_counts() if 'disruption_classification' in match_df.columns else pd.Series()
+                    if len(sev_counts):
+                        sev_colors_map = {'CRITICAL': '#ff4b4b', 'HIGH': '#ff9933', 'MODERATE': '#ffdd00', 'LOW': '#00ff88'}
+                        fig_pie = go.Figure(go.Pie(
+                            labels=sev_counts.index.tolist(),
+                            values=sev_counts.values.tolist(),
+                            hole=0.6,
+                            marker_colors=[sev_colors_map.get(s, '#888') for s in sev_counts.index],
+                            hovertemplate='<b>%{label}</b>: %{value} signals<extra></extra>',
+                            textinfo='percent+label',
+                        ))
+                        fig_pie.update_layout(
+                            template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)',
+                            plot_bgcolor='rgba(0,0,0,0)', height=240,
+                            margin=dict(l=0, r=0, t=30, b=0),
+                            showlegend=False,
+                            title=dict(text='Severity Mix', font=dict(color='#aaa', size=13), x=0)
+                        )
+                        st.plotly_chart(fig_pie, use_container_width=True)
+
+                with list_col:
+                    st.markdown(f"**Top {len(results)} Signals — ranked by semantic relevance to this lens**")
+
+                    for sig, score in results:
+                        severity = sig.get('disruption_classification', 'LOW')
+                        badge = PRIORITY_BADGE.get(severity, '⚪')
+                        sev_color = SEVERITY_COLORS.get(severity, '#888')
+                        dim = sig.get('primary_dimension', '')
+                        dim_color = PESTEL_COLORS.get(dim, '#999')
+
+                        with st.expander(
+                            f"{badge} {sig['title'][:90]}{'…' if len(sig['title']) > 90 else ''}"
+                        ):
+                            # Header row: dimension badge + scores
+                            h1, h2, h3, h4 = st.columns([2, 1, 1, 1])
+                            with h1:
+                                st.markdown(
+                                    f"<span style='background:{dim_color}22;color:{dim_color};"
+                                    f"padding:2px 8px;border-radius:4px;font-size:11px;"
+                                    f"font-weight:bold;'>{dim}</span>",
+                                    unsafe_allow_html=True
+                                )
+                            with h2:
+                                st.metric("Relevance", f"{score:.3f}", help="Semantic similarity score (0–1).")
+                            with h3:
+                                st.metric("Impact", f"{sig.get('impact_score') or 0:.2f}")
+                            with h4:
+                                st.metric("Novelty", f"{sig.get('novelty_score') or 0:.2f}")
+
+                            # Content excerpt
+                            content = sig.get('content', '')
+                            st.caption(content[:500] + '…' if len(content) > 500 else content)
+
+                            # Source link
+                            if sig.get('url'):
+                                st.markdown(f"[🔗 Open Source]({sig['url']})")
+
+                            # Date
+                            if sig.get('date_ingested'):
+                                st.caption(f"Ingested: {sig['date_ingested']}")
+
+                st.markdown("---")
+
+                # ── Full signal table export ────────────────────────────
+                with st.expander("📋 Full Signal Table (all matched signals)"):
+                    table_rows = [
                         {
                             'Title': s['title'],
                             'Dimension': s.get('primary_dimension', ''),
@@ -1737,209 +1772,25 @@ with tab7:
                             'Impact': round(s.get('impact_score') or 0, 2),
                             'Novelty': round(s.get('novelty_score') or 0, 2),
                             'Velocity': round(s.get('velocity_score') or 0, 2),
+                            'Relevance Score': round(score, 3),
                             'Source URL': s.get('url', ''),
+                            'Date': s.get('date_ingested', ''),
                         }
-                        for s in impact['top_signals']
-                    ])
+                        for s, score in results
+                    ]
                     st.dataframe(
-                        top_df, use_container_width=True, hide_index=True,
+                        pd.DataFrame(table_rows),
+                        use_container_width=True,
+                        hide_index=True,
                         column_config={
                             "Title": st.column_config.TextColumn("Signal", width="large"),
                             "Impact": st.column_config.NumberColumn("Impact", format="%.2f"),
                             "Novelty": st.column_config.NumberColumn("Novelty", format="%.2f"),
                             "Velocity": st.column_config.NumberColumn("Velocity", format="%.2f"),
+                            "Relevance Score": st.column_config.NumberColumn("Relevance", format="%.3f"),
                             "Source URL": st.column_config.LinkColumn("🔗 Source"),
                         }
                     )
-
-                # Competitor signals
-                if competitor_signals:
-                    st.markdown(f"**🏭 {len(competitor_signals)} Competitor-Related Signal(s) Detected**")
-                    for cs in competitor_signals[:5]:
-                        with st.expander(f"🏭 {cs['title']} [{cs.get('primary_dimension','')}]"):
-                            st.caption(cs.get('content', '')[:400] + '...' if len(cs.get('content','')) > 400 else cs.get('content',''))
-                            if cs.get('url'):
-                                st.markdown(f"[🔗 Source]({cs['url']})")
-                else:
-                    st.info("No competitor signals in current database. Expand scouting scope to competitor press releases and patent filings.")
-
-        # ── SECTION 3: Sales Recommendations ─────────────────────────
-        with section_tabs[2]:
-            st.markdown("### Sales Recommendations & Insights")
-            st.caption(
-                "Structured commercial recommendations for AGCO/Fendt sales leadership, "
-                "derived from subsidy program analysis and live signal intelligence."
-            )
-
-            sales_recs = etractor.generate_sales_recommendations(signals)
-            for rec in sales_recs:
-                priority_color = SEVERITY_COLORS.get(rec['priority'], '#888')
-                badge = PRIORITY_BADGE.get(rec['priority'], '⚪')
-                with st.expander(f"{badge} [{rec['area']}] {rec['title']}", expanded=True):
-                    col_left, col_right = st.columns([3, 1])
-                    with col_left:
-                        st.markdown(f"**Recommendation:**  \n{rec['recommendation']}")
-                        st.markdown(f"**Recommended Action:**  \n_{rec['action']}_")
-                    with col_right:
-                        st.markdown(
-                            f"<div style='padding:10px;background:rgba(255,255,255,0.04);border-radius:6px;text-align:center;'>"
-                            f"<p style='color:#888;margin:0;font-size:11px;'>KPI</p>"
-                            f"<p style='color:#e0e0e0;margin:4px 0;font-size:12px;'>{rec['kpi']}</p>"
-                            f"<p style='color:{priority_color};margin:0;font-size:12px;font-weight:bold;'>{rec['priority']}</p>"
-                            f"</div>",
-                            unsafe_allow_html=True
-                        )
-
-        # ── SECTION 4: Marketing Recommendations ─────────────────────
-        with section_tabs[3]:
-            st.markdown("### Marketing Recommendations & Insights")
-            st.caption(
-                "Strategy, campaign concepts, and communication measures "
-                "tailored to e-tractor adoption barriers and Fendt's market position."
-            )
-
-            marketing_recs = etractor.generate_marketing_recommendations()
-            for rec in marketing_recs:
-                priority_color = SEVERITY_COLORS.get(rec['priority'], '#888')
-                badge = PRIORITY_BADGE.get(rec['priority'], '⚪')
-                with st.expander(f"{badge} [{rec['category']}] {rec['title']}", expanded=True):
-                    st.markdown(f"**Why this matters:**  \n{rec['rationale']}")
-                    st.markdown(
-                        f"<div style='padding:12px;background:rgba(0,180,80,0.06);border-radius:6px;"
-                        f"border-left:3px solid #00cc55;margin:10px 0;'>"
-                        f"<p style='color:#aaa;margin:0;font-size:13px;'>"
-                        f"<b>💡 Campaign Concept:</b> {rec['campaign_concept']}</p>"
-                        f"</div>",
-                        unsafe_allow_html=True
-                    )
-                    st.markdown("**Recommended Channels:**")
-                    for ch in rec['channels']:
-                        st.markdown(f"- {ch}")
-                    st.markdown(
-                        f"<p style='color:{priority_color};font-size:12px;margin:4px 0;'>"
-                        f"<b>KPI:</b> {rec['kpi']}</p>",
-                        unsafe_allow_html=True
-                    )
-
-        # ── SECTION 5: Customer Needs ─────────────────────────────────
-        with section_tabs[4]:
-            st.markdown("### E-Tractor Specific Customer Needs")
-            st.caption(
-                "How electric tractor customer needs differ from standard diesel tractor usage — "
-                "and what this means for Fendt product, service, and sales strategy."
-            )
-
-            needs = etractor.generate_etractor_customer_needs()
-            for need in needs:
-                risk_col = SEVERITY_COLORS.get(need['risk_if_not_addressed'], '#888')
-                badge = PRIORITY_BADGE.get(need['risk_if_not_addressed'], '⚪')
-                with st.expander(f"{badge} {need['need_area']}", expanded=False):
-                    col_d, col_e = st.columns(2)
-                    with col_d:
-                        st.markdown(
-                            f"<div style='padding:10px;background:rgba(255,100,0,0.06);border-radius:6px;height:100%;'>"
-                            f"<p style='color:#888;font-size:11px;margin:0 0 4px 0;'>DIESEL BASELINE</p>"
-                            f"<p style='color:#ccc;font-size:13px;margin:0;'>{need['diesel_baseline']}</p>"
-                            f"</div>",
-                            unsafe_allow_html=True
-                        )
-                    with col_e:
-                        st.markdown(
-                            f"<div style='padding:10px;background:rgba(0,180,80,0.07);border-radius:6px;height:100%;'>"
-                            f"<p style='color:#888;font-size:11px;margin:0 0 4px 0;'>E-TRACTOR REQUIREMENT</p>"
-                            f"<p style='color:#ccc;font-size:13px;margin:0;'>{need['etractor_requirement']}</p>"
-                            f"</div>",
-                            unsafe_allow_html=True
-                        )
-                    st.markdown(
-                        f"<div style='padding:10px;background:rgba(0,140,255,0.07);border-radius:6px;"
-                        f"border-left:3px solid #00ccff;margin-top:8px;'>"
-                        f"<p style='color:#888;font-size:11px;margin:0 0 4px 0;'>FENDT IMPLICATION</p>"
-                        f"<p style='color:#e0e0e0;font-size:13px;margin:0;'>{need['fendt_implication']}</p>"
-                        f"</div>",
-                        unsafe_allow_html=True
-                    )
-                    st.markdown(
-                        f"<p style='color:{risk_col};font-size:12px;margin:8px 0 0 0;'>"
-                        f"<b>Risk if not addressed: {need['risk_if_not_addressed']}</b></p>",
-                        unsafe_allow_html=True
-                    )
-
-        # ── SECTION 6: Semantic Search ────────────────────────────────
-        with section_tabs[5]:
-            st.markdown("### 🔍 Semantic Signal Search")
-            st.markdown(
-                f"""
-                <div style='padding: 12px 16px; background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.08);'>
-                    <p style='color: #aaa; margin: 0; font-size: 13px;'>
-                    Search the signal database by meaning, not exact keywords.
-                    Uses <b>{'TF-IDF vector similarity (scikit-learn)' if searcher.is_sklearn_available() else 'keyword fallback (install scikit-learn for semantic search)'}</b>.
-                    Index covers <b>{searcher.index_size()} signals</b>.
-                    </p>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            query_col, k_col = st.columns([4, 1])
-            with query_col:
-                search_query = st.text_input(
-                    "🔍 Enter a topic or question",
-                    placeholder="e.g. EU subsidies for electric agricultural machinery 2026",
-                    help="Search by concept — the engine finds signals semantically similar to your query."
-                )
-            with k_col:
-                top_k = st.number_input("Results", min_value=3, max_value=20, value=8, step=1)
-
-            preset_queries = [
-                "EU subsidies electric tractors",
-                "battery technology agriculture",
-                "charging infrastructure rural",
-                "competitor electric tractor launch",
-                "CAP reform green deal farm",
-                "EU battery mandate compliance 2027",
-            ]
-            st.caption("Quick searches:")
-            preset_cols = st.columns(len(preset_queries))
-            for i, pq in enumerate(preset_queries):
-                with preset_cols[i]:
-                    if st.button(pq, key=f"preset_{i}"):
-                        search_query = pq
-
-            if search_query:
-                with st.spinner("Searching signal database..."):
-                    results = searcher.search(search_query, top_k=top_k)
-
-                if results:
-                    st.markdown(f"**{len(results)} results for: _{search_query}_**")
-                    for sig, score in results:
-                        severity = sig.get('disruption_classification', 'LOW')
-                        badge = PRIORITY_BADGE.get(severity, '⚪')
-                        sev_color = SEVERITY_COLORS.get(severity, '#888')
-                        with st.expander(
-                            f"{badge} {sig['title']} [{sig.get('primary_dimension', '')}] — Score: {score:.3f}"
-                        ):
-                            col_s1, col_s2 = st.columns([3, 1])
-                            with col_s1:
-                                st.caption(
-                                    sig.get('content', '')[:400] + '...'
-                                    if len(sig.get('content', '')) > 400
-                                    else sig.get('content', '')
-                                )
-                                if sig.get('url'):
-                                    st.markdown(f"[🔗 Open Source]({sig['url']})")
-                            with col_s2:
-                                st.metric("Impact", f"{sig.get('impact_score') or 0:.2f}")
-                                st.metric("Novelty", f"{sig.get('novelty_score') or 0:.2f}")
-                                st.markdown(
-                                    f"<p style='color:{sev_color};font-size:12px;margin:4px 0;'>"
-                                    f"<b>{severity}</b></p>",
-                                    unsafe_allow_html=True
-                                )
-                else:
-                    st.info("No matching signals found. Try a broader search term or run the intelligence sweep to add more signals.")
-            else:
-                st.info("Enter a search query above to find semantically similar signals in the database.")
 
 # ===========================
 # FOOTER

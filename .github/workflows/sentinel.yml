@@ -25,15 +25,6 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install Claude Code CLI
-        run: |
-          npm install -g @anthropic-ai/claude-code
-
       - name: Run Sentinel Pipeline
         run: |
           python sentinel.py --run-once
