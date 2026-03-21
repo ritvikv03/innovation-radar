@@ -78,13 +78,14 @@ class InnovationRadar:
                 hoverinfo='skip'
             ))
 
-        # Add ring circles (time horizons) with glowing effect
+        # Add ring circles (time horizons) — each ring uses its own classification color
         for horizon, config in self.rings.items():
             fig.add_trace(go.Scatterpolar(
                 r=[config['radius']] * 360,
                 theta=list(range(360)),
                 mode='lines',
-                line=dict(color='rgba(0, 255, 136, 0.4)', width=2),
+                line=dict(color=config['color'], width=2),
+                opacity=0.75,
                 name=config['label'],
                 showlegend=True
             ))
@@ -153,6 +154,20 @@ class InnovationRadar:
                     name=title_text
                 ))
 
+        # Dynamically build axis labels — hide sectors with no signals to avoid empty quadrants
+        dims_with_signals = set(sig.get('primary_dimension', '') for sig in signals)
+        ordered_dims = ['POLITICAL', 'ECONOMIC', 'SOCIAL', 'TECHNOLOGICAL',
+                        'ENVIRONMENTAL', 'LEGAL', 'INNOVATION', 'SOCIAL_MEDIA']
+        display_names = {
+            'POLITICAL': 'POLITICAL', 'ECONOMIC': 'ECONOMIC', 'SOCIAL': 'SOCIAL',
+            'TECHNOLOGICAL': 'TECHNOLOGICAL', 'ENVIRONMENTAL': 'ENVIRONMENTAL',
+            'LEGAL': 'LEGAL', 'INNOVATION': 'INNOVATION', 'SOCIAL_MEDIA': 'SOCIAL MEDIA'
+        }
+        tick_labels = [
+            f'<b>{display_names[dim]}</b>' if dim in dims_with_signals else ''
+            for dim in ordered_dims
+        ]
+
         # Update layout with dark cyberpunk theme
         fig.update_layout(
             template='plotly_dark',
@@ -172,9 +187,7 @@ class InnovationRadar:
                 ),
                 angularaxis=dict(
                     tickvals=[22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5],
-                    ticktext=['<b>POLITICAL</b>', '<b>ECONOMIC</b>', '<b>SOCIAL</b>',
-                             '<b>TECHNOLOGICAL</b>', '<b>ENVIRONMENTAL</b>', '<b>LEGAL</b>',
-                             '<b>INNOVATION</b>', '<b>SOCIAL MEDIA</b>'],
+                    ticktext=tick_labels,
                     tickfont=dict(size=14, family='Arial Black', color='#00ccff'),
                     direction='clockwise',
                     gridcolor='rgba(0, 204, 255, 0.2)'

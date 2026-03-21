@@ -51,6 +51,18 @@ except ImportError:
     from q2_solution.database import SignalDatabase
 
 try:
+    from use_case_1_etractor import ETractorIntelligence
+    from semantic_search import SemanticSearch
+    ETRACTOR_AVAILABLE = True
+except ImportError:
+    try:
+        from q2_solution.use_case_1_etractor import ETractorIntelligence
+        from q2_solution.semantic_search import SemanticSearch
+        ETRACTOR_AVAILABLE = True
+    except ImportError:
+        ETRACTOR_AVAILABLE = False
+
+try:
     from innovation_radar import InnovationRadar, PESTEL_COLORS
 except ImportError:
     try:
@@ -63,14 +75,63 @@ except ImportError:
             'INNOVATION': '#00ccff', 'SOCIAL_MEDIA': '#ff69b4',
         }
 
-def get_api_key():
+# Preferred Gemini models in priority order (newest stable first)
+_GEMINI_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"]
+
+
+def get_api_key() -> str:
     """Get Gemini API key from Streamlit secrets (cloud) or env (local)."""
     try:
         if "GEMINI_API_KEY" in st.secrets:
             return st.secrets["GEMINI_API_KEY"]
     except Exception:
         pass
-    return os.getenv("GEMINI_API_KEY")
+    return os.getenv("GEMINI_API_KEY", "")
+
+
+@st.cache_data(ttl=1800)  # Re-check every 30 minutes
+def check_gemini_health() -> tuple:
+    """
+    Probe the Gemini API once and cache the result for 30 minutes.
+
+    Returns:
+        (is_healthy: bool, model_name: str, status_msg: str)
+    """
+    api_key = get_api_key()
+    if not api_key or not GEMINI_AVAILABLE:
+        return False, "", "No API key configured"
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        for model_name in _GEMINI_MODELS:
+            try:
+                model = genai.GenerativeModel(model_name)
+                resp = model.generate_content(
+                    "Reply with exactly two words: STATUS OK",
+                    generation_config={"max_output_tokens": 10},
+                )
+                if resp.text:
+                    return True, model_name, f"OK ({model_name})"
+            except Exception as e:
+                err = str(e)
+                if "429" in err or "quota" in err.lower() or "RESOURCE_EXHAUSTED" in err:
+                    return False, "", "Daily quota exhausted — rule-based fallback active"
+                # Other error: try next model
+                continue
+        return False, "", "All Gemini models unavailable"
+    except Exception as e:
+        return False, "", f"Gemini error: {str(e)[:80]}"
+
+
+def _get_gemini_model():
+    """Return a ready GenerativeModel using the healthiest available model, or None."""
+    healthy, model_name, _ = check_gemini_health()
+    if not healthy:
+        return None
+    import google.generativeai as genai
+    genai.configure(api_key=get_api_key())
+    return genai.GenerativeModel(model_name)
 
 
 def _empty_state(icon: str, title: str, message: str, action: str = "") -> None:
@@ -91,16 +152,23 @@ def _empty_state(icon: str, title: str, message: str, action: str = "") -> None:
 
 
 def _api_unavailable_state(feature: str) -> None:
-    """Render a stylized warning when Gemini API key is missing."""
+    """Render a stylized warning when Gemini API is unavailable (missing key or quota)."""
+    _, _, status_msg = check_gemini_health()
+    is_quota = "quota" in status_msg.lower() or "exhausted" in status_msg.lower()
+    icon = "⏳" if is_quota else "⚙️"
+    detail = (
+        "Daily free-tier quota exhausted. The rule-based fallback is active. "
+        "The quota resets at midnight UTC, or upgrade to a paid Gemini plan for uninterrupted AI."
+        if is_quota else
+        f"<strong>{feature}</strong> requires a <code>GEMINI_API_KEY</code> in Streamlit secrets "
+        f"or your <code>.env</code> file. A rule-based fallback is active in the meantime."
+    )
     st.markdown(f"""
-    <div style='padding:20px 24px;background:rgba(255,153,0,0.08);
-                border-left:4px solid #ff9900;border-radius:8px;margin:16px 0;'>
-        <h4 style='color:#ff9900;margin:0 0 6px 0;'>⚙️ API Key Required</h4>
-        <p style='color:#ccc;margin:0;font-size:14px;'>
-            <strong>{feature}</strong> requires a <code>GEMINI_API_KEY</code> in your
-            <code>.env</code> file. Add it to unlock AI-powered analysis.
-            A rule-based fallback is active in the meantime.
-        </p>
+    <div style='padding:16px 20px;background:rgba(255,153,0,0.08);
+                border-left:4px solid #ff9900;border-radius:8px;margin:12px 0;'>
+        <h4 style='color:#ff9900;margin:0 0 4px 0;'>{icon} AI Fallback Mode — {feature}</h4>
+        <p style='color:#ccc;margin:0;font-size:13px;'>{detail}</p>
+        <p style='color:#888;margin:4px 0 0 0;font-size:12px;'>Status: {status_msg}</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -211,8 +279,9 @@ def generate_bluf_narrative(db_stats: Dict, signals: List[Dict]) -> str:
     critical_df = df[df['disruption_classification'] == 'CRITICAL'].sort_values('impact_score', ascending=False)
     top_threat = critical_df.iloc[0]['title'] if len(critical_df) > 0 else None
 
-    # If no API key or Gemini not installed, use intelligent rule-based fallback
-    if not api_key or not GEMINI_AVAILABLE:
+    # Use rule-based fallback if Gemini is unavailable or quota exhausted
+    gemini_model = _get_gemini_model()
+    if not gemini_model:
         # Sentence 1: Overall status and volume
         sentence1 = f"Currently tracking {db_stats['total_signals']} disruption signals with {critical_count} CRITICAL and {high_count} HIGH priority threats demanding immediate attention."
 
@@ -237,13 +306,11 @@ def generate_bluf_narrative(db_stats: Dict, signals: List[Dict]) -> str:
 
         return f"{sentence1} {sentence2} {sentence3}"
 
-    # If API key available and Gemini installed, use AI for sophisticated analysis
+    # AI path — Gemini is healthy, generate sophisticated narrative
     avg_impact = df['impact_score'].mean() if 'impact_score' in df.columns else 0
     avg_novelty = df['novelty_score'].mean() if 'novelty_score' in df.columns else 0
 
-    # Build context for Gemini
-    context = f"""
-DATABASE STATISTICS:
+    context = f"""DATABASE STATISTICS:
 - Total Signals: {db_stats['total_signals']}
 - Date Range: {db_stats['date_range']['earliest']} to {db_stats['date_range']['latest']}
 
@@ -253,39 +320,33 @@ PESTEL DISTRIBUTION:
 SEVERITY BREAKDOWN:
 {chr(10).join(f'- {severity}: {count}' for severity, count in severity_counts.items())}
 
-AVERAGE SCORES:
-- Impact: {avg_impact:.2f} / 1.0
-- Velocity: {avg_velocity:.2f} / 1.0 (momentum tracking)
-- Novelty: {avg_novelty:.2f} / 1.0
+AVERAGE SCORES: Impact {avg_impact:.2f} | Velocity {avg_velocity:.2f} | Novelty {avg_novelty:.2f}
 
-TOP CRITICAL THREAT:
-{top_threat}
-"""
+TOP CRITICAL THREAT: {top_threat}"""
 
-    # Configure Gemini
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
-
-    prompt = f"""You are a strategic advisor delivering a Bottom Line Up Front (BLUF) briefing to AGCO/Fendt's C-suite.
-
-Analyze the following intelligence data and generate EXACTLY 3 sentences that are:
-1. Hard-hitting and direct (no corporate fluff)
-2. Action-oriented (highlight what executives need to know NOW)
-3. Data-driven (reference specific numbers and trends)
-
-INTELLIGENCE DATA:
-{context}
-
-Generate the 3-sentence BLUF now. Do NOT include any preamble, title, or conclusion. ONLY the 3 sentences."""
+    prompt = (
+        "You are a strategic advisor delivering a BLUF briefing to AGCO/Fendt's senior leadership. "
+        "Analyze the data below and write EXACTLY 3 hard-hitting, data-driven sentences. "
+        "No preamble, no titles, no bullet points — ONLY the 3 sentences.\n\n"
+        f"{context}"
+    )
 
     try:
-        # Call Gemini
-        response = model.generate_content(prompt)
-        narrative = response.text.strip()
-        return narrative
+        response = gemini_model.generate_content(
+            prompt, generation_config={"max_output_tokens": 300}
+        )
+        return response.text.strip()
+    except Exception:
+        # Fall through to rule-based on any error
+        pass
 
-    except Exception as e:
-        return f"⚠️ Error generating BLUF narrative: {str(e)}"
+    # Fallback if AI call fails mid-flight
+    return (
+        f"Currently tracking {db_stats['total_signals']} disruption signals with "
+        f"{critical_count} CRITICAL and {high_count} HIGH priority threats. "
+        f"{top_dimension} dimension shows highest concentration ({top_dimension_pct:.0f}%). "
+        f"{'Priority threat: ' + top_threat[:80] + '...' if top_threat else 'No critical threats detected.'}"
+    )
 
 # ===========================
 # THE INQUISITION - GEMINI API
@@ -302,72 +363,44 @@ def generate_strategic_questions(critical_signals: List[Dict]) -> List[str]:
     Returns:
         List of strategic questions
     """
-    api_key = get_api_key()
+    _fallback_questions = [
+        "If EU electrification mandates accelerate to 2027, which Fendt R&D programs face obsolescence?",
+        "Which competitor is closest to commercializing autonomous precision farming, and what is Fendt's countermove?",
+        "How does the CAP subsidy reallocation toward sustainability affect Fendt's core diesel tractor revenue?",
+    ]
 
-    if not api_key or not GEMINI_AVAILABLE:
-        return [
-            "If EU electrification mandates accelerate to 2027, which Fendt R&D programs face obsolescence?",
-            "Which competitor is closest to commercializing autonomous precision farming, and what is Fendt's countermove?",
-            "How does the CAP subsidy reallocation toward sustainability affect Fendt's core diesel tractor revenue?",
-        ]
+    gemini_model = _get_gemini_model()
+    if not gemini_model:
+        return _fallback_questions
 
-    # Prepare signal context
-    signal_summaries = []
-    for sig in critical_signals[:10]:  # Limit to top 10 to avoid token overflow
-        signal_summaries.append(
-            f"- {sig['title']} [{sig['primary_dimension']}] "
-            f"(Disruption: {sig.get('disruption_classification', 'N/A')}, "
-            f"Impact: {sig.get('impact_score', 0):.2f})"
-        )
+    signal_summaries = "\n".join(
+        f"- {sig['title']} [{sig['primary_dimension']}] "
+        f"(Disruption: {sig.get('disruption_classification', 'N/A')}, "
+        f"Impact: {sig.get('impact_score', 0):.2f})"
+        for sig in critical_signals[:10]
+    )
 
-    context = "\n".join(signal_summaries)
-
-    # Configure Gemini
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
-
-    # Craft the prompt
-    prompt = f"""You are a strategic advisor to AGCO/Fendt's C-suite leadership team.
-
-Based on these CRITICAL disruption signals detected in the European agricultural market:
-
-{context}
-
-Generate 3-5 hard-hitting, aggressive strategic questions that force executive reflection and action. These questions should:
-1. Challenge existing R&D roadmaps
-2. Expose potential strategic blind spots
-3. Highlight competitive threats or regulatory risks
-4. Force decisions on resource allocation
-5. Question timeline assumptions
-
-Format: Return ONLY the questions, numbered 1-5, no preamble or conclusion.
-
-Example style:
-"If EU mandates electric tractors by 2027, how does Fendt's current diesel-focused R&D avoid obsolescence?"
-"Which competitor will exploit this regulatory gap first, and what is Fendt's countermove?"
-
-Generate the questions now:"""
+    prompt = (
+        "You are a strategic advisor to AGCO/Fendt's senior leadership. "
+        "Based on these disruption signals, generate 3-5 hard-hitting strategic questions "
+        "numbered 1-5. No preamble. ONLY the questions.\n\n"
+        f"SIGNALS:\n{signal_summaries}"
+    )
 
     try:
-        # Generate response
+        response = gemini_model.generate_content(
+            prompt, generation_config={"max_output_tokens": 400}
+        )
         questions = []
-        response = model.generate_content(prompt)
-        response_text = response.text
-
-        # Parse numbered questions
-        lines = response_text.strip().split('\n')
-        for line in lines:
+        for line in response.text.strip().split('\n'):
             line = line.strip()
             if line and (line[0].isdigit() or line.startswith('-')):
-                # Remove numbering
-                question = line.lstrip('0123456789.-) *').strip()
-                if question:
-                    questions.append(question)
-
-        return questions if questions else ["No questions generated. Try again."]
-
-    except Exception as e:
-        return [f"⚠️ Error generating questions: {str(e)}"]
+                q = line.lstrip('0123456789.-) *').strip()
+                if q:
+                    questions.append(q)
+        return questions if questions else _fallback_questions
+    except Exception:
+        return _fallback_questions
 
 # ===========================
 # MAIN DASHBOARD
@@ -396,6 +429,17 @@ else:
     st.sidebar.info("Run the daily intelligence sweep to populate data.")
 
 st.sidebar.markdown("---")
+
+# Gemini API health status
+_g_healthy, _g_model, _g_status = check_gemini_health()
+_g_color = "#00ff88" if _g_healthy else "#ff9933"
+_g_icon = "🟢" if _g_healthy else "🟡"
+st.sidebar.markdown(
+    f"<span style='font-size:12px;color:{_g_color};'>{_g_icon} AI: {_g_status}</span>",
+    unsafe_allow_html=True,
+)
+
+st.sidebar.markdown("---")
 st.sidebar.markdown("**PESTEL-EL Breakdown**")
 if stats['signals_per_dimension']:
     for dim, count in stats['signals_per_dimension'].items():
@@ -413,13 +457,14 @@ signals = load_all_signals()
 # TAB LAYOUT
 # ===========================
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "📊 Executive Summary",
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    "📊 Intelligence Overview",
     "🎯 Innovation Radar",
-    "📡 Live Signal Feed",
+    "📡 PESTEL Signal Monitor",
     "⚔️ The Inquisition",
     "🕸️ Knowledge Graph",
-    "📄 Strategic Reports"
+    "📄 Strategic Reports",
+    "🔋 E-Tractor Intelligence",
 ])
 
 # ===========================
@@ -427,7 +472,17 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 # ===========================
 
 with tab1:
-    st.subheader("Executive Summary")
+    st.subheader("Intelligence Overview")
+    st.markdown("""
+    <div style='padding: 12px 16px; background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 18px; border: 1px solid rgba(255,255,255,0.08);'>
+        <p style='color: #aaaaaa; margin: 0; font-size: 14px;'>
+        This tab provides an automated overview of disruption signals detected, classified, and scored by the Sentinel.
+        Signals are ingested from live EU agricultural intelligence sources (EUR-Lex, Eurostat, news APIs) and evaluated
+        across eight PESTEL-EL dimensions. Metrics below reflect the current contents of the intelligence database —
+        they are updated each time the daily sweep runs.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     if not signals:
         _empty_state(
@@ -441,8 +496,14 @@ with tab1:
         # ===========================
 
         st.markdown("""
-        <div style='padding: 20px; background: linear-gradient(135deg, rgba(0,100,200,0.15) 0%, rgba(0,50,100,0.2) 100%); border-left: 4px solid #00ccff; border-radius: 10px; margin-bottom: 25px;'>
-            <h3 style='color: #00ccff; margin: 0 0 10px 0;'>🎯 Bottom Line Up Front (BLUF)</h3>
+        <div style='padding: 20px; background: linear-gradient(135deg, rgba(0,100,200,0.15) 0%, rgba(0,50,100,0.2) 100%); border-left: 4px solid #00ccff; border-radius: 10px; margin-bottom: 10px;'>
+            <h3 style='color: #00ccff; margin: 0 0 6px 0;'>🎯 AI-Generated Signal Synthesis (BLUF)</h3>
+            <p style='color: #888; margin: 0; font-size: 13px;'>
+                Bottom Line Up Front — a 3-sentence strategic summary of the signals currently in the intelligence database,
+                generated automatically from PESTEL distribution, severity counts, and disruption scores.
+                <b>Note:</b> "Novelty" measures how unique each signal is <em>relative to previously ingested signals in this database</em>,
+                not whether the event is globally new. A high novelty score means the Sentinel has not seen this type of signal before.
+            </p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -475,15 +536,24 @@ with tab1:
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
-            st.metric("Total Signals", len(signals))
+            st.metric(
+                "Total Signals", len(signals),
+                help="Total number of classified disruption signals ingested from monitored EU agricultural intelligence sources (EUR-Lex, Eurostat, news APIs). Each signal is a detected event or trend that has been scored for Impact, Novelty, and Velocity."
+            )
 
         with col2:
             critical_count = len(df[df['disruption_classification'] == 'CRITICAL'])
-            st.metric("🔴 Critical", critical_count)
+            st.metric(
+                "🔴 Critical", critical_count,
+                help="CRITICAL signals are classified as immediate-horizon threats (0–12 months) with a composite disruption score above the CRITICAL threshold. These require urgent review by senior leadership (CEO, CFO, CTO, VP R&D)."
+            )
 
         with col3:
             high_count = len(df[df['disruption_classification'] == 'HIGH'])
-            st.metric("🟠 High", high_count)
+            st.metric(
+                "🟠 High", high_count,
+                help="HIGH signals are near-term threats (12–24 months) with elevated disruption scores. These require strategic planning and resource allocation decisions at the VP/Director level."
+            )
 
         with col4:
             # Average disruption score
@@ -497,7 +567,17 @@ with tab1:
 
         # Time-Series Velocity Chart
         st.markdown("### 📈 Temporal Velocity Tracking")
-        st.caption("**Signal volume over time demonstrates mathematical momentum tracking (not static data)**")
+        st.markdown("""
+        <div style='padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-bottom: 10px; border-left: 3px solid rgba(0,204,255,0.4);'>
+            <p style='color: #aaa; margin: 0; font-size: 13px;'>
+            <b>What this chart shows:</b> The number of new disruption signals ingested per day over time.
+            A rising curve indicates accelerating activity in the intelligence feed (more events detected).
+            A flat or declining curve indicates a quieter period. This view enables tracking whether disruption
+            momentum is building, stable, or decelerating — distinct from any individual signal's Velocity score
+            (which measures a single signal's acceleration relative to historical averages).
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
         # Group signals by date and count
         if 'date_ingested' in df.columns:
@@ -550,7 +630,16 @@ with tab1:
 
         # Critical Disruptions Section
         st.markdown("### 🚨 Top 3 Critical Disruptions")
-        st.caption("**Highest-priority signals requiring immediate C-suite attention**")
+        st.markdown("""
+        <div style='padding: 10px 14px; background: rgba(255,75,75,0.06); border-radius: 6px; margin-bottom: 10px; border-left: 3px solid rgba(255,75,75,0.5);'>
+            <p style='color: #aaa; margin: 0; font-size: 13px;'>
+            Signals classified as <b>CRITICAL</b> (composite disruption score in the top tier, immediate 0–12 month horizon).
+            Ranked by Impact score. Each card shows the signal's content excerpt, source link, and individual
+            Impact / Novelty / Velocity sub-scores. These are the three signals most likely to require
+            a strategic response from senior leadership in the near term.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
         critical_signals = df[df['disruption_classification'] == 'CRITICAL'].to_dict('records')
 
@@ -673,12 +762,78 @@ with tab2:
                 st.error(f"Error generating radar: {str(e)}")
                 st.info("Ensure plotly is installed: pip install plotly")
 
+            # Signal table with source links
+            st.markdown("---")
+            st.markdown("### 📋 Plotted Signals — Source Reference")
+            st.caption("All signals currently displayed on the radar, with direct links to source documents.")
+
+            # Build table from original signals (with URL) for filtered dimensions
+            radar_table_data = []
+            for sig in filtered_signals:
+                classification = sig.get('disruption_classification', 'LOW')
+                if classification == 'CRITICAL':
+                    horizon_label = '🔴 12 Month'
+                elif classification == 'HIGH':
+                    horizon_label = '🟡 24 Month'
+                else:
+                    horizon_label = '🟢 36 Month'
+
+                impact = sig.get('impact_score', 0) if sig.get('impact_score') is not None else 0
+                novelty = sig.get('novelty_score', 0) if sig.get('novelty_score') is not None else 0
+                velocity = sig.get('velocity_score', 0) if sig.get('velocity_score') is not None else 0
+                disruption_score = round(impact * 0.5 + novelty * 0.3 + velocity * 0.2, 3)
+
+                radar_table_data.append({
+                    'Title': sig['title'],
+                    'Dimension': sig['primary_dimension'],
+                    'Severity': classification,
+                    'Time Horizon': horizon_label,
+                    'Disruption Score': disruption_score,
+                    'Source URL': sig.get('url', ''),
+                })
+
+            radar_table_df = pd.DataFrame(radar_table_data).sort_values('Disruption Score', ascending=False)
+            st.dataframe(
+                radar_table_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Title": st.column_config.TextColumn("Signal Title", width="large"),
+                    "Dimension": st.column_config.TextColumn("PESTEL Dimension", width="small"),
+                    "Severity": st.column_config.TextColumn("Severity", width="small"),
+                    "Time Horizon": st.column_config.TextColumn("Time Horizon", width="small",
+                        help="Horizon is derived from severity: CRITICAL → 12 months, HIGH → 24 months, MODERATE/LOW → 36 months."),
+                    "Disruption Score": st.column_config.NumberColumn("Score", format="%.3f", width="small",
+                        help="Composite score = Impact×0.5 + Novelty×0.3 + Velocity×0.2"),
+                    "Source URL": st.column_config.LinkColumn("🔗 Source", width="medium",
+                        help="Direct link to the original source document."),
+                }
+            )
+
 # ===========================
 # TAB 3: LIVE SIGNAL FEED
 # ===========================
 
 with tab3:
-    st.subheader("Live Signal Feed - All Data")
+    st.subheader("PESTEL Signal Monitor")
+    st.markdown("""
+    <div style='padding: 12px 16px; background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 18px; border: 1px solid rgba(255,255,255,0.08);'>
+        <p style='color: #aaaaaa; margin: 0 0 8px 0; font-size: 14px;'>
+        Raw intelligence signals ingested from monitored sources, fully searchable and filterable.
+        Each signal has been classified into a PESTEL-EL dimension and scored on three axes:
+        </p>
+        <ul style='color: #888; margin: 0; font-size: 13px; padding-left: 18px;'>
+            <li><b>Impact (0–1):</b> Magnitude of the disruption — how many PESTEL dimensions are affected and whether it involves a high-leverage trigger (legal mandate, technology breakthrough, subsidy change).</li>
+            <li><b>Novelty (0–1):</b> Uniqueness relative to signals already in this database — calculated via text similarity matching against historical entries. High novelty = the Sentinel has not seen this type of event before.</li>
+            <li><b>Velocity (0–1):</b> Momentum — mathematical comparison of 30-day signal volume vs. the trailing 6-month average. High velocity = this topic is actively accelerating.</li>
+        </ul>
+        <p style='color: #888; margin: 8px 0 0 0; font-size: 13px;'>
+        <b>Severity classification</b> is derived from the composite disruption score
+        (Impact×0.5 + Novelty×0.3 + Velocity×0.2): CRITICAL ≥ 0.7 · HIGH ≥ 0.5 · MODERATE ≥ 0.3 · LOW &lt; 0.3.
+        Duplicate signals (same source URL) are filtered at display time.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     if not signals:
         _empty_state(
@@ -689,6 +844,12 @@ with tab3:
     else:
         df = pd.DataFrame(signals)
 
+        # Deduplicate by URL at display time (keep first / most recent occurrence)
+        if 'url' in df.columns:
+            df_deduped = df.drop_duplicates(subset=['url'], keep='first').copy()
+        else:
+            df_deduped = df.copy()
+
         # Search and filter controls
         col_search, col_filter = st.columns([2, 1])
 
@@ -698,12 +859,12 @@ with tab3:
         with col_filter:
             dimension_filter = st.multiselect(
                 "Filter by dimension",
-                options=df['primary_dimension'].unique().tolist(),
+                options=df_deduped['primary_dimension'].unique().tolist(),
                 default=[]
             )
 
         # Apply filters
-        filtered_df = df.copy()
+        filtered_df = df_deduped.copy()
 
         if search_term:
             filtered_df = filtered_df[
@@ -715,13 +876,17 @@ with tab3:
         if dimension_filter:
             filtered_df = filtered_df[filtered_df['primary_dimension'].isin(dimension_filter)]
 
-        st.caption(f"Showing {len(filtered_df)} of {len(df)} signals")
+        duplicates_removed = len(df) - len(df_deduped)
+        caption_parts = [f"Showing {len(filtered_df)} of {len(df_deduped)} signals"]
+        if duplicates_removed > 0:
+            caption_parts.append(f"({duplicates_removed} duplicate URLs removed)")
+        st.caption(" ".join(caption_parts))
 
-        # Display configuration
+        # Display configuration — include URL as clickable link
         display_columns = [
             'title', 'primary_dimension', 'disruption_classification',
             'impact_score', 'novelty_score', 'velocity_score',
-            'date_ingested', 'source'
+            'date_ingested', 'source', 'url'
         ]
 
         # Only show columns that exist
@@ -733,23 +898,44 @@ with tab3:
             use_container_width=True,
             hide_index=True,
             column_config={
-                "title": st.column_config.TextColumn("Title", width="large"),
-                "primary_dimension": st.column_config.TextColumn("Dimension", width="small"),
-                "disruption_classification": st.column_config.TextColumn("Severity", width="small"),
+                "title": st.column_config.TextColumn(
+                    "Title", width="large",
+                    help="Signal title as extracted from the source document."
+                ),
+                "primary_dimension": st.column_config.TextColumn(
+                    "Dimension", width="small",
+                    help="The primary PESTEL-EL dimension this signal belongs to, determined by the Classifier agent based on signal content and keyword triggers."
+                ),
+                "disruption_classification": st.column_config.TextColumn(
+                    "Severity", width="small",
+                    help="Severity classification derived from composite disruption score: CRITICAL (≥0.7), HIGH (≥0.5), MODERATE (≥0.3), LOW (<0.3). Reflects urgency of response, not absolute danger."
+                ),
                 "impact_score": st.column_config.NumberColumn(
                     "Impact",
                     format="%.2f",
-                    help="Impact (0.0-1.0) measures magnitude. Calculated algorithmically based on cross-PESTEL reach (how many dimensions the signal affects) and high-leverage triggers like legal mandates or tech breakthroughs. Crucial for flagging existential industry threats."
+                    help="Impact (0.0–1.0): Magnitude of disruption. Calculated based on cross-PESTEL reach (how many dimensions the signal touches) and high-leverage triggers like legal mandates or technology breakthroughs."
                 ),
                 "novelty_score": st.column_config.NumberColumn(
                     "Novelty",
                     format="%.2f",
-                    help="Novelty (0.0-1.0) measures uniqueness. Calculated via inverse-similarity text matching against historical signals in the SQLite database. Crucial for separating true emerging anomalies from repetitive background noise."
+                    help="Novelty (0.0–1.0): Uniqueness vs. existing database entries. Uses text similarity matching — high novelty means the Sentinel has not previously seen this type of signal. Does NOT indicate global newness."
                 ),
                 "velocity_score": st.column_config.NumberColumn(
                     "Velocity",
                     format="%.2f",
-                    help="Velocity (0.0-1.0) measures acceleration. Derived mathematically by comparing recent 30-day signal volume against the trailing 6-month historical average. Crucial to prove a trend is actively gaining momentum, rather than just being a one-off event."
+                    help="Velocity (0.0–1.0): Momentum score. Compares 30-day signal count for this topic vs. 6-month historical average. High velocity = trend actively accelerating."
+                ),
+                "date_ingested": st.column_config.TextColumn(
+                    "Date Ingested", width="small",
+                    help="Date the signal was detected and ingested by the Sentinel pipeline."
+                ),
+                "source": st.column_config.TextColumn(
+                    "Source", width="small",
+                    help="Publication or data provider name (e.g., EUR-Lex, Eurostat, AgriPulse)."
+                ),
+                "url": st.column_config.LinkColumn(
+                    "🔗 Source Link", width="medium",
+                    help="Direct link to the original source document. Click to open in browser."
                 ),
             }
         )
@@ -854,54 +1040,45 @@ with tab4:
                 with st.chat_message("user"):
                     st.markdown(prompt)
 
-                # Generate Claude response
+                # Generate AI response
                 with st.chat_message("assistant"):
-                    with st.spinner("Claude is thinking..."):
-                        try:
-                            api_key = get_api_key()
-                            genai.configure(api_key=api_key)
-                            model = genai.GenerativeModel('gemini-2.5-flash')
+                    with st.spinner("Generating strategic analysis..."):
+                        inq_model = _get_gemini_model()
+                        if not inq_model:
+                            _, _, status = check_gemini_health()
+                            st.warning(
+                                f"AI unavailable ({status}). The Inquisition requires Gemini to respond. "
+                                "Please try again after midnight UTC when the quota resets, "
+                                "or configure a paid Gemini API key in Streamlit secrets."
+                            )
+                        else:
+                            try:
+                                signal_context = "\n".join(
+                                    f"- {sig['title']} [{sig['primary_dimension']}] "
+                                    f"(Impact: {sig.get('impact_score', 0):.2f})"
+                                    for sig in high_priority_signals[:10]
+                                )
+                                chat_context = (
+                                    "You are a strategic advisor to AGCO/Fendt's senior leadership "
+                                    "in a strategic dialogue about agricultural industry disruptions.\n\n"
+                                    f"INTELLIGENCE CONTEXT:\n{signal_context}\n\n"
+                                )
+                                for msg in st.session_state.inquisition_messages[:-1]:
+                                    chat_context += f"{msg['role'].upper()}: {msg['content']}\n\n"
+                                chat_context += f"USER: {prompt}\n\nRespond strategically:"
 
-                            # Build signal context
-                            signal_context = "\n".join([
-                                f"- {sig['title']} [{sig['primary_dimension']}] (Impact: {sig.get('impact_score', 0):.2f})"
-                                for sig in high_priority_signals[:10]
-                            ])
-
-                            # System prompt
-                            system_prompt = f"""You are a strategic advisor to AGCO/Fendt's C-suite engaged in a strategic dialogue about agricultural industry disruptions.
-
-CURRENT INTELLIGENCE CONTEXT:
-{signal_context}
-
-Your role:
-1. Provide hard-hitting, data-driven strategic insights
-2. Challenge assumptions and identify blind spots
-3. Explore alternative scenarios when asked
-4. Reference specific signals and scores in your analysis
-5. Be direct and action-oriented"""
-
-                            # Compile context
-                            chat_context = f"{system_prompt}\n\n"
-                            # Skip the last message which is the current prompt, we will append it explicitly
-                            for msg in st.session_state.inquisition_messages[:-1]:
-                                chat_context += f"{msg['role'].upper()}: {msg['content']}\n\n"
-                            
-                            chat_context += f"USER: {prompt}\n\nPlease respond strategically:"
-
-                            response = model.generate_content(chat_context)
-                            full_response = response.text
-
-                            st.markdown(full_response)
-
-                            # Add assistant response to history
-                            st.session_state.inquisition_messages.append({
-                                "role": "assistant",
-                                "content": full_response
-                            })
-
-                        except Exception as e:
-                            st.error(f"⚠️ Error generating response: {str(e)}")
+                                response = inq_model.generate_content(
+                                    chat_context,
+                                    generation_config={"max_output_tokens": 600},
+                                )
+                                full_response = response.text
+                                st.markdown(full_response)
+                                st.session_state.inquisition_messages.append({
+                                    "role": "assistant",
+                                    "content": full_response,
+                                })
+                            except Exception as e:
+                                st.error(f"Error: {str(e)[:200]}")
 
             # Show signal context
             with st.expander("📋 View High-Priority Signals Being Analyzed"):
@@ -922,7 +1099,18 @@ with tab5:
     </div>
     """, unsafe_allow_html=True)
 
-    st.caption("**The Knowledge Graph maps ripple effects between PESTEL dimensions. Choose your preferred view below.**")
+    st.markdown("""
+    <div style='padding: 12px 16px; background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 18px; border: 1px solid rgba(255,255,255,0.08);'>
+        <p style='color: #aaaaaa; margin: 0 0 8px 0; font-size: 14px;'><b>How it works:</b></p>
+        <ul style='color: #888; margin: 0; font-size: 13px; padding-left: 18px;'>
+            <li><b>Nodes</b> represent named entities extracted from intelligence signals — a regulatory policy, a market shift, a technology, or a physical event.</li>
+            <li><b>Edges</b> represent causal relationships between two entities, identified by the Analyst agent from signal content and verbatim quotes. Each edge has a <b>weight</b> (−1.0 to +1.0): positive = one event accelerates or enables the other; negative = one event restricts or counters the other.</li>
+            <li><b>Temporal decay:</b> Edge weights decay with a 90-day half-life — older, unconfirmed relationships automatically lose influence. Edges below 0.05 are pruned.</li>
+            <li><b>Provenance:</b> Every edge must have a verified <code>source_url</code> and an <code>exact_quote</code> from the source (minimum 10 characters) — required for EU Data Act 2026 compliance.</li>
+            <li><b>Color coding</b> (node color = PESTEL dimension; edge color = relationship strength and direction — see legend below the graph).</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
 
     graph_path = Path('./data/graph.json')
 
@@ -1208,15 +1396,550 @@ with tab6:
             st.markdown(report_content, unsafe_allow_html=True)
 
             st.markdown("---")
-            st.download_button(
-                label="📥 Download Report as Markdown",
-                data=report_content,
-                file_name=selected_report,
-                mime="text/markdown"
-            )
+            st.markdown("**Download report as:**")
+            dl_col1, dl_col2, dl_col3 = st.columns(3)
+
+            with dl_col1:
+                st.download_button(
+                    label="📄 Markdown (.md)",
+                    data=report_content,
+                    file_name=selected_report,
+                    mime="text/markdown"
+                )
+
+            with dl_col2:
+                # Generate PDF using reportlab
+                try:
+                    from reportlab.lib.pagesizes import A4
+                    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                    from reportlab.lib.units import cm
+                    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+                    from reportlab.lib import colors
+                    import io
+                    import re
+
+                    def _md_to_pdf_bytes(md_text: str, title: str) -> bytes:
+                        buffer = io.BytesIO()
+                        doc = SimpleDocTemplate(
+                            buffer, pagesize=A4,
+                            rightMargin=2*cm, leftMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm
+                        )
+                        styles = getSampleStyleSheet()
+                        story = []
+
+                        h1_style = ParagraphStyle('H1', parent=styles['Heading1'], fontSize=16, spaceAfter=10, textColor=colors.HexColor('#003366'))
+                        h2_style = ParagraphStyle('H2', parent=styles['Heading2'], fontSize=13, spaceAfter=8, textColor=colors.HexColor('#004499'))
+                        h3_style = ParagraphStyle('H3', parent=styles['Heading3'], fontSize=11, spaceAfter=6, textColor=colors.HexColor('#0055AA'))
+                        body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=10, spaceAfter=6, leading=14)
+                        bullet_style = ParagraphStyle('Bullet', parent=styles['Normal'], fontSize=10, leftIndent=20, spaceAfter=4, leading=13)
+
+                        for line in md_text.split('\n'):
+                            line_stripped = line.strip()
+                            if not line_stripped:
+                                story.append(Spacer(1, 6))
+                            elif line_stripped.startswith('### '):
+                                txt = line_stripped[4:].replace('**', '').replace('*', '')
+                                story.append(Paragraph(txt, h3_style))
+                            elif line_stripped.startswith('## '):
+                                txt = line_stripped[3:].replace('**', '').replace('*', '')
+                                story.append(Paragraph(txt, h2_style))
+                            elif line_stripped.startswith('# '):
+                                txt = line_stripped[2:].replace('**', '').replace('*', '')
+                                story.append(Paragraph(txt, h1_style))
+                            elif line_stripped.startswith('---'):
+                                story.append(HRFlowable(width="100%", thickness=0.5, color=colors.grey))
+                                story.append(Spacer(1, 4))
+                            elif line_stripped.startswith('- ') or line_stripped.startswith('* '):
+                                txt = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line_stripped[2:])
+                                txt = re.sub(r'\*(.*?)\*', r'<i>\1</i>', txt)
+                                story.append(Paragraph(f'• {txt}', bullet_style))
+                            else:
+                                txt = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line_stripped)
+                                txt = re.sub(r'\*(.*?)\*', r'<i>\1</i>', txt)
+                                txt = re.sub(r'`(.*?)`', r'<font face="Courier">\1</font>', txt)
+                                story.append(Paragraph(txt, body_style))
+
+                        doc.build(story)
+                        return buffer.getvalue()
+
+                    pdf_bytes = _md_to_pdf_bytes(report_content, selected_report)
+                    pdf_filename = selected_report.replace('.md', '.pdf')
+                    st.download_button(
+                        label="📕 PDF (.pdf)",
+                        data=pdf_bytes,
+                        file_name=pdf_filename,
+                        mime="application/pdf"
+                    )
+                except ImportError:
+                    st.caption("reportlab not installed — PDF unavailable")
+                except Exception as pdf_err:
+                    st.caption(f"PDF error: {pdf_err}")
+
+            with dl_col3:
+                # Generate PPTX using python-pptx
+                try:
+                    from pptx import Presentation
+                    from pptx.util import Inches, Pt
+                    from pptx.dml.color import RGBColor
+                    import io
+                    import re
+
+                    def _md_to_pptx_bytes(md_text: str, title: str) -> bytes:
+                        prs = Presentation()
+                        prs.slide_width = Inches(13.33)
+                        prs.slide_height = Inches(7.5)
+
+                        blank_layout = prs.slide_layouts[6]
+                        title_layout = prs.slide_layouts[0]
+
+                        # Title slide
+                        title_slide = prs.slides.add_slide(title_layout)
+                        title_slide.shapes.title.text = title.replace('.md', '').replace('_', ' ').title()
+                        subtitle_ph = title_slide.placeholders[1]
+                        subtitle_ph.text = f"Fendt PESTEL-EL Sentinel — {datetime.now().strftime('%B %d, %Y')}"
+
+                        current_slide = None
+                        current_tf = None
+                        FENDT_GREEN = RGBColor(0x00, 0x66, 0x33)
+                        DARK_BLUE = RGBColor(0x00, 0x33, 0x66)
+
+                        for line in md_text.split('\n'):
+                            line_stripped = line.strip()
+                            if line_stripped.startswith('# ') or line_stripped.startswith('## '):
+                                # New slide per major heading
+                                current_slide = prs.slides.add_slide(blank_layout)
+                                txBox = current_slide.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(12.3), Inches(1.0))
+                                tf = txBox.text_frame
+                                tf.word_wrap = True
+                                p = tf.paragraphs[0]
+                                p.text = line_stripped.lstrip('#').strip()
+                                p.runs[0].font.size = Pt(28)
+                                p.runs[0].font.bold = True
+                                p.runs[0].font.color.rgb = FENDT_GREEN
+
+                                # Body text box for this slide
+                                body_box = current_slide.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(12.3), Inches(5.5))
+                                current_tf = body_box.text_frame
+                                current_tf.word_wrap = True
+                            elif current_tf and line_stripped and not line_stripped.startswith('---'):
+                                clean = re.sub(r'\*\*(.*?)\*\*', r'\1', line_stripped)
+                                clean = re.sub(r'\*(.*?)\*', r'\1', clean)
+                                clean = re.sub(r'`(.*?)`', r'\1', clean)
+                                if line_stripped.startswith('- ') or line_stripped.startswith('* '):
+                                    clean = '• ' + clean[2:]
+                                p = current_tf.add_paragraph()
+                                p.text = clean
+                                p.font.size = Pt(13)
+                                p.space_after = Pt(4)
+
+                        buffer = io.BytesIO()
+                        prs.save(buffer)
+                        return buffer.getvalue()
+
+                    pptx_bytes = _md_to_pptx_bytes(report_content, selected_report)
+                    pptx_filename = selected_report.replace('.md', '.pptx')
+                    st.download_button(
+                        label="📊 PowerPoint (.pptx)",
+                        data=pptx_bytes,
+                        file_name=pptx_filename,
+                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    )
+                except ImportError:
+                    st.caption("python-pptx not installed — PPTX unavailable")
+                except Exception as pptx_err:
+                    st.caption(f"PPTX error: {pptx_err}")
 
         except Exception as e:
             st.error(f"Error reading report: {str(e)}")
+
+# ===========================
+# TAB 7: E-TRACTOR INTELLIGENCE (USE CASE 1)
+# ===========================
+
+SEVERITY_COLORS = {
+    'CRITICAL': '#ff0066',
+    'HIGH': '#ff9933',
+    'MODERATE': '#ffff00',
+    'LOW': '#00ff88',
+}
+PRIORITY_BADGE = {
+    'CRITICAL': '🔴',
+    'HIGH': '🟠',
+    'MODERATE': '🟡',
+    'LOW': '🟢',
+}
+
+with tab7:
+    st.markdown("""
+    <div style='text-align: center; padding: 15px; background: rgba(0,180,80,0.1); border-left: 4px solid #00cc55; border-radius: 5px; margin-bottom: 20px;'>
+        <h2 style='color: #00cc55; margin: 0;'>🔋 Use Case 1: Electric Tractor Intelligence</h2>
+        <p style='color: #ccc; margin: 5px 0 0 0;'>Subsidies · Business Impact · Sales & Marketing Recommendations · Customer Needs</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if not ETRACTOR_AVAILABLE:
+        _empty_state(
+            "🔋", "E-Tractor Module Unavailable",
+            "use_case_1_etractor.py or semantic_search.py not found.",
+            "Ensure both files are in the q2_solution/ directory."
+        )
+    else:
+        etractor = ETractorIntelligence()
+        searcher = SemanticSearch()
+        searcher.build_index(signals)
+
+        # ── Overview metrics ────────────────────────────────────────────
+        impact = etractor.generate_business_impact(signals)
+        relevant_signals = etractor.get_relevant_signals(signals)
+        competitor_signals = etractor.get_competitor_signals(signals)
+
+        risk_color = {'HIGH': '#ff0066', 'MODERATE': '#ff9933', 'LOW': '#00ff88'}.get(
+            impact['overall_risk_level'], '#999'
+        )
+
+        col_r1, col_r2, col_r3, col_r4 = st.columns(4)
+        with col_r1:
+            st.metric(
+                "🔋 E-Tractor Signals", impact['total_relevant_signals'],
+                help="Signals in the database that contain electric tractor, battery, subsidy, or related keywords."
+            )
+        with col_r2:
+            st.metric(
+                "🔴 Critical / High", impact['critical_high_count'],
+                help="Subset classified as CRITICAL or HIGH severity — requiring immediate strategic attention."
+            )
+        with col_r3:
+            st.metric(
+                "🏭 Competitor Signals", len(competitor_signals),
+                help="Signals mentioning competitor brands (John Deere, CNH, Claas, Kubota, etc.) in the e-tractor context."
+            )
+        with col_r4:
+            st.metric(
+                "⚡ Avg Impact Score", f"{impact['avg_impact_score']:.2f}",
+                help="Average Impact score (0–1) across e-tractor-relevant signals."
+            )
+
+        st.markdown(
+            f"<div style='padding:10px 14px;background:rgba(255,255,255,0.04);border-radius:6px;"
+            f"border-left:4px solid {risk_color};margin-bottom:18px;'>"
+            f"<b style='color:{risk_color};'>Overall Risk Level: {impact['overall_risk_level']}</b>"
+            f"<span style='color:#888;font-size:13px;'> — based on {impact['critical_high_count']} "
+            f"CRITICAL/HIGH signals out of {impact['total_relevant_signals']} e-tractor-relevant signals detected.</span>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+        st.markdown("---")
+
+        # ── Seven sections via expanders ────────────────────────────────
+        section_tabs = st.tabs([
+            "🌍 Subsidy Programs",
+            "📊 Business Impact",
+            "💼 Sales Recommendations",
+            "📣 Marketing Recommendations",
+            "🚜 Customer Needs",
+            "🔍 Semantic Search",
+        ])
+
+        # ── SECTION 1: Subsidy Programs ──────────────────────────────
+        with section_tabs[0]:
+            st.markdown("### Available Subsidy & Incentive Programs")
+            st.caption(
+                "Static knowledge base covering current (2024–2027) programs. "
+                "Amounts and eligibility criteria are indicative — verify with national agricultural agencies before advising customers."
+            )
+
+            country_selected = st.selectbox(
+                "🌍 Select Country / Region",
+                options=etractor.get_all_countries(),
+                help="Select a geography to view applicable subsidy programs for electric tractor adoption."
+            )
+
+            country_data = etractor.get_subsidy_programs(country_selected)
+            st.markdown(
+                f"<div style='padding:10px 14px;background:rgba(0,180,80,0.07);border-radius:6px;"
+                f"border-left:3px solid #00cc55;margin-bottom:14px;'>"
+                f"<p style='color:#aaa;margin:0;font-size:14px;'>{country_data.get('headline', '')}</p>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+
+            for prog in country_data.get('programs', []):
+                rel_color = SEVERITY_COLORS.get(prog['relevance'], '#888')
+                badge = PRIORITY_BADGE.get(prog['relevance'], '⚪')
+                with st.expander(f"{badge} {prog['name']} — {prog['type']}"):
+                    col_a, col_b = st.columns([3, 1])
+                    with col_a:
+                        st.markdown(f"**Description:** {prog['description']}")
+                        st.markdown(f"**Timeline:** {prog['timeline']}")
+                        if prog.get('url'):
+                            st.markdown(f"**Source:** [{prog['url']}]({prog['url']})")
+                    with col_b:
+                        st.markdown(
+                            f"<div style='padding:10px;background:rgba(255,255,255,0.04);border-radius:6px;text-align:center;'>"
+                            f"<p style='color:#888;margin:0;font-size:11px;'>AMOUNT</p>"
+                            f"<p style='color:#e0e0e0;margin:4px 0;font-size:13px;font-weight:bold;'>{prog['amount']}</p>"
+                            f"<p style='color:{rel_color};margin:0;font-size:12px;font-weight:bold;'>{prog['relevance']} RELEVANCE</p>"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
+
+            if not country_data.get('programs'):
+                st.info("No subsidy data available for this selection.")
+
+        # ── SECTION 2: Business Impact ───────────────────────────────
+        with section_tabs[1]:
+            st.markdown("### Business Impact Assessment — AGCO/Fendt")
+            st.caption(
+                "Analysis derived from live intelligence signals in the database. "
+                "Refreshes automatically as new signals are ingested."
+            )
+
+            if not relevant_signals:
+                _empty_state(
+                    "🔋", "No E-Tractor Signals Detected",
+                    "Run the intelligence sweep to populate e-tractor relevant signals.",
+                    "python sentinel.py --run-once"
+                )
+            else:
+                # Dimension distribution
+                if impact['dimension_distribution']:
+                    st.markdown("**📊 Signal Distribution by PESTEL Dimension**")
+                    dim_df = pd.DataFrame([
+                        {'Dimension': k, 'Signal Count': v}
+                        for k, v in sorted(impact['dimension_distribution'].items(), key=lambda x: x[1], reverse=True)
+                    ])
+                    import plotly.graph_objects as go
+                    fig_dim = go.Figure(go.Bar(
+                        x=dim_df['Dimension'],
+                        y=dim_df['Signal Count'],
+                        marker_color=[PESTEL_COLORS.get(d, '#999') for d in dim_df['Dimension']],
+                        hovertemplate='<b>%{x}</b>: %{y} signals<extra></extra>'
+                    ))
+                    fig_dim.update_layout(
+                        template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)', height=280,
+                        margin=dict(l=0, r=0, t=10, b=0),
+                        yaxis=dict(gridcolor='rgba(255,255,255,0.1)'),
+                        xaxis=dict(gridcolor='rgba(255,255,255,0.05)')
+                    )
+                    st.plotly_chart(fig_dim, use_container_width=True)
+
+                # Top signals table
+                st.markdown("**🔴 Top E-Tractor Signals by Impact**")
+                if impact['top_signals']:
+                    top_df = pd.DataFrame([
+                        {
+                            'Title': s['title'],
+                            'Dimension': s.get('primary_dimension', ''),
+                            'Severity': s.get('disruption_classification', ''),
+                            'Impact': round(s.get('impact_score') or 0, 2),
+                            'Novelty': round(s.get('novelty_score') or 0, 2),
+                            'Velocity': round(s.get('velocity_score') or 0, 2),
+                            'Source URL': s.get('url', ''),
+                        }
+                        for s in impact['top_signals']
+                    ])
+                    st.dataframe(
+                        top_df, use_container_width=True, hide_index=True,
+                        column_config={
+                            "Title": st.column_config.TextColumn("Signal", width="large"),
+                            "Impact": st.column_config.NumberColumn("Impact", format="%.2f"),
+                            "Novelty": st.column_config.NumberColumn("Novelty", format="%.2f"),
+                            "Velocity": st.column_config.NumberColumn("Velocity", format="%.2f"),
+                            "Source URL": st.column_config.LinkColumn("🔗 Source"),
+                        }
+                    )
+
+                # Competitor signals
+                if competitor_signals:
+                    st.markdown(f"**🏭 {len(competitor_signals)} Competitor-Related Signal(s) Detected**")
+                    for cs in competitor_signals[:5]:
+                        with st.expander(f"🏭 {cs['title']} [{cs.get('primary_dimension','')}]"):
+                            st.caption(cs.get('content', '')[:400] + '...' if len(cs.get('content','')) > 400 else cs.get('content',''))
+                            if cs.get('url'):
+                                st.markdown(f"[🔗 Source]({cs['url']})")
+                else:
+                    st.info("No competitor signals in current database. Expand scouting scope to competitor press releases and patent filings.")
+
+        # ── SECTION 3: Sales Recommendations ─────────────────────────
+        with section_tabs[2]:
+            st.markdown("### Sales Recommendations & Insights")
+            st.caption(
+                "Structured commercial recommendations for AGCO/Fendt sales leadership, "
+                "derived from subsidy program analysis and live signal intelligence."
+            )
+
+            sales_recs = etractor.generate_sales_recommendations(signals)
+            for rec in sales_recs:
+                priority_color = SEVERITY_COLORS.get(rec['priority'], '#888')
+                badge = PRIORITY_BADGE.get(rec['priority'], '⚪')
+                with st.expander(f"{badge} [{rec['area']}] {rec['title']}", expanded=True):
+                    col_left, col_right = st.columns([3, 1])
+                    with col_left:
+                        st.markdown(f"**Recommendation:**  \n{rec['recommendation']}")
+                        st.markdown(f"**Recommended Action:**  \n_{rec['action']}_")
+                    with col_right:
+                        st.markdown(
+                            f"<div style='padding:10px;background:rgba(255,255,255,0.04);border-radius:6px;text-align:center;'>"
+                            f"<p style='color:#888;margin:0;font-size:11px;'>KPI</p>"
+                            f"<p style='color:#e0e0e0;margin:4px 0;font-size:12px;'>{rec['kpi']}</p>"
+                            f"<p style='color:{priority_color};margin:0;font-size:12px;font-weight:bold;'>{rec['priority']}</p>"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
+
+        # ── SECTION 4: Marketing Recommendations ─────────────────────
+        with section_tabs[3]:
+            st.markdown("### Marketing Recommendations & Insights")
+            st.caption(
+                "Strategy, campaign concepts, and communication measures "
+                "tailored to e-tractor adoption barriers and Fendt's market position."
+            )
+
+            marketing_recs = etractor.generate_marketing_recommendations()
+            for rec in marketing_recs:
+                priority_color = SEVERITY_COLORS.get(rec['priority'], '#888')
+                badge = PRIORITY_BADGE.get(rec['priority'], '⚪')
+                with st.expander(f"{badge} [{rec['category']}] {rec['title']}", expanded=True):
+                    st.markdown(f"**Why this matters:**  \n{rec['rationale']}")
+                    st.markdown(
+                        f"<div style='padding:12px;background:rgba(0,180,80,0.06);border-radius:6px;"
+                        f"border-left:3px solid #00cc55;margin:10px 0;'>"
+                        f"<p style='color:#aaa;margin:0;font-size:13px;'>"
+                        f"<b>💡 Campaign Concept:</b> {rec['campaign_concept']}</p>"
+                        f"</div>",
+                        unsafe_allow_html=True
+                    )
+                    st.markdown("**Recommended Channels:**")
+                    for ch in rec['channels']:
+                        st.markdown(f"- {ch}")
+                    st.markdown(
+                        f"<p style='color:{priority_color};font-size:12px;margin:4px 0;'>"
+                        f"<b>KPI:</b> {rec['kpi']}</p>",
+                        unsafe_allow_html=True
+                    )
+
+        # ── SECTION 5: Customer Needs ─────────────────────────────────
+        with section_tabs[4]:
+            st.markdown("### E-Tractor Specific Customer Needs")
+            st.caption(
+                "How electric tractor customer needs differ from standard diesel tractor usage — "
+                "and what this means for Fendt product, service, and sales strategy."
+            )
+
+            needs = etractor.generate_etractor_customer_needs()
+            for need in needs:
+                risk_col = SEVERITY_COLORS.get(need['risk_if_not_addressed'], '#888')
+                badge = PRIORITY_BADGE.get(need['risk_if_not_addressed'], '⚪')
+                with st.expander(f"{badge} {need['need_area']}", expanded=False):
+                    col_d, col_e = st.columns(2)
+                    with col_d:
+                        st.markdown(
+                            f"<div style='padding:10px;background:rgba(255,100,0,0.06);border-radius:6px;height:100%;'>"
+                            f"<p style='color:#888;font-size:11px;margin:0 0 4px 0;'>DIESEL BASELINE</p>"
+                            f"<p style='color:#ccc;font-size:13px;margin:0;'>{need['diesel_baseline']}</p>"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
+                    with col_e:
+                        st.markdown(
+                            f"<div style='padding:10px;background:rgba(0,180,80,0.07);border-radius:6px;height:100%;'>"
+                            f"<p style='color:#888;font-size:11px;margin:0 0 4px 0;'>E-TRACTOR REQUIREMENT</p>"
+                            f"<p style='color:#ccc;font-size:13px;margin:0;'>{need['etractor_requirement']}</p>"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
+                    st.markdown(
+                        f"<div style='padding:10px;background:rgba(0,140,255,0.07);border-radius:6px;"
+                        f"border-left:3px solid #00ccff;margin-top:8px;'>"
+                        f"<p style='color:#888;font-size:11px;margin:0 0 4px 0;'>FENDT IMPLICATION</p>"
+                        f"<p style='color:#e0e0e0;font-size:13px;margin:0;'>{need['fendt_implication']}</p>"
+                        f"</div>",
+                        unsafe_allow_html=True
+                    )
+                    st.markdown(
+                        f"<p style='color:{risk_col};font-size:12px;margin:8px 0 0 0;'>"
+                        f"<b>Risk if not addressed: {need['risk_if_not_addressed']}</b></p>",
+                        unsafe_allow_html=True
+                    )
+
+        # ── SECTION 6: Semantic Search ────────────────────────────────
+        with section_tabs[5]:
+            st.markdown("### 🔍 Semantic Signal Search")
+            st.markdown(
+                f"""
+                <div style='padding: 12px 16px; background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.08);'>
+                    <p style='color: #aaa; margin: 0; font-size: 13px;'>
+                    Search the signal database by meaning, not exact keywords.
+                    Uses <b>{'TF-IDF vector similarity (scikit-learn)' if searcher.is_sklearn_available() else 'keyword fallback (install scikit-learn for semantic search)'}</b>.
+                    Index covers <b>{searcher.index_size()} signals</b>.
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            query_col, k_col = st.columns([4, 1])
+            with query_col:
+                search_query = st.text_input(
+                    "🔍 Enter a topic or question",
+                    placeholder="e.g. EU subsidies for electric agricultural machinery 2026",
+                    help="Search by concept — the engine finds signals semantically similar to your query."
+                )
+            with k_col:
+                top_k = st.number_input("Results", min_value=3, max_value=20, value=8, step=1)
+
+            preset_queries = [
+                "EU subsidies electric tractors",
+                "battery technology agriculture",
+                "charging infrastructure rural",
+                "competitor electric tractor launch",
+                "CAP reform green deal farm",
+                "EU battery mandate compliance 2027",
+            ]
+            st.caption("Quick searches:")
+            preset_cols = st.columns(len(preset_queries))
+            for i, pq in enumerate(preset_queries):
+                with preset_cols[i]:
+                    if st.button(pq, key=f"preset_{i}"):
+                        search_query = pq
+
+            if search_query:
+                with st.spinner("Searching signal database..."):
+                    results = searcher.search(search_query, top_k=top_k)
+
+                if results:
+                    st.markdown(f"**{len(results)} results for: _{search_query}_**")
+                    for sig, score in results:
+                        severity = sig.get('disruption_classification', 'LOW')
+                        badge = PRIORITY_BADGE.get(severity, '⚪')
+                        sev_color = SEVERITY_COLORS.get(severity, '#888')
+                        with st.expander(
+                            f"{badge} {sig['title']} [{sig.get('primary_dimension', '')}] — Score: {score:.3f}"
+                        ):
+                            col_s1, col_s2 = st.columns([3, 1])
+                            with col_s1:
+                                st.caption(
+                                    sig.get('content', '')[:400] + '...'
+                                    if len(sig.get('content', '')) > 400
+                                    else sig.get('content', '')
+                                )
+                                if sig.get('url'):
+                                    st.markdown(f"[🔗 Open Source]({sig['url']})")
+                            with col_s2:
+                                st.metric("Impact", f"{sig.get('impact_score') or 0:.2f}")
+                                st.metric("Novelty", f"{sig.get('novelty_score') or 0:.2f}")
+                                st.markdown(
+                                    f"<p style='color:{sev_color};font-size:12px;margin:4px 0;'>"
+                                    f"<b>{severity}</b></p>",
+                                    unsafe_allow_html=True
+                                )
+                else:
+                    st.info("No matching signals found. Try a broader search term or run the intelligence sweep to add more signals.")
+            else:
+                st.info("Enter a search query above to find semantically similar signals in the database.")
 
 # ===========================
 # FOOTER

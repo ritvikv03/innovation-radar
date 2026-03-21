@@ -2,15 +2,15 @@ name: Fendt PESTEL-EL Sentinel
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Run daily at midnight UTC
-  workflow_dispatch:      # Allow manual trigger
+    - cron: "0 0 * * *" # Run daily at midnight UTC
+  workflow_dispatch: # Allow manual trigger
 
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
     permissions:
-      contents: write    # Required to push graph updates back to the repo
-    
+      contents: write # Required to push graph updates back to the repo
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -18,8 +18,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          cache: 'pip'
+          python-version: "3.10"
+          cache: "pip"
 
       - name: Install Python Dependencies
         run: |
@@ -28,7 +28,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install Claude Code CLI
         run: |
@@ -36,10 +36,9 @@ jobs:
 
       - name: Run Sentinel Pipeline
         run: |
-          # Use the orchestrator in --run-once mode
-          # The orchestrator will automatically pick up ANTHROPIC_API_KEY from env
           python sentinel.py --run-once
         env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           FIRE_CRAWL_API_KEY: ${{ secrets.FIRE_CRAWL_API_KEY }}
 
@@ -48,5 +47,5 @@ jobs:
           git config --global user.name "Sentinel Bot"
           git config --global user.email "bot@fendt-innovation.ai"
           git add data/graph.json data/sentinel_state.json logs/sentinel.log raw_ingest/ output/
-          git commit -m "📊 Autonomous Update: $(date +'%Y-%m-%d %H:%M')" || echo "No changes to commit"
+          git commit -m "Autonomous Update: $(date +'%Y-%m-%d %H:%M')" || echo "No changes to commit"
           git push
