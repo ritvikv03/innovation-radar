@@ -1,46 +1,89 @@
-# Python Dependencies for Fendt PESTEL-EL Sentinel
-# Install with: pip install -r requirements.txt
-
-# Core Dependencies
-networkx>=3.0          # Knowledge Graph engine
-requests>=2.31.0       # HTTP requests for APIs
-beautifulsoup4>=4.12.0 # HTML parsing (Scout agent)
-python-dotenv>=1.0.0   # Environment variable management
-google-generativeai>=0.4.0 # Gemini API integration
-
-# Data Processing
-pandas>=2.0.0          # Data manipulation (for Eurostat/FAOSTAT processing)
-numpy>=1.24.0          # Numerical operations
-scikit-learn>=1.4.0    # TF-IDF semantic search (SemanticSearch module)
-
-# Web Scraping & APIs (CRITICAL FOR Q2 INDUSTRY DATA)
-firecrawl-py>=0.0.15   # Firecrawl SDK for Scout agent
-arxiv>=2.0.0           # ArXiv research paper API
-feedparser>=6.0.10     # RSS feed parsing (AgriPulse, EurActiv, etc.)
-
-# Visualization/UI (Q2 Dashboard Requirements)
-streamlit>=1.31.0      # Web application framework
-pyvis>=0.3.2           # Network visualization (Knowledge Graph)
-plotly>=5.18.0         # Interactive charts (Innovation Radar, PESTEL timelines)
-matplotlib>=3.8.0      # Static charts
-seaborn>=0.13.0        # Statistical visualizations
-
-# Report Generation (Board Presentation Export)
-python-pptx>=0.6.23    # PowerPoint export
-reportlab>=4.0.0       # PDF export
-markdown>=3.5.0        # Markdown processing
-
-# Optional: NLP for entity extraction (Analyst agent)
-# Uncomment if you want advanced entity extraction beyond graph_utils.py
-# spacy>=3.7.0
-# transformers>=4.30.0
-
-# Optional: API clients for specific sources
-# Uncomment as needed for production deployment
-# eurostat>=1.0.0      # Eurostat SDMX API client
-# openmeteo-py>=0.2.0  # Open-Meteo weather API
-
-# Development Dependencies
-pytest>=7.4.0          # Testing framework
-black>=23.0.0          # Code formatting
-mypy>=1.8.0            # Type checking
+appnope==0.1.4
+asgiref==3.11.0
+asttokens==2.4.1
+attrs==24.2.0
+beautifulsoup4==4.14.2
+blinker==1.9.0
+certifi==2024.8.30
+cffi==2.0.0
+charset-normalizer==3.4.4
+click==8.3.1
+comm==0.2.2
+curl_cffi==0.13.0
+dash==4.1.0
+dash-bootstrap-components==2.0.4
+debugpy==1.8.7
+decorator==5.1.1
+Django==5.2.8
+executing==2.1.0
+Flask==3.1.3
+frozendict==2.4.7
+h11==0.14.0
+idna==3.10
+image==1.5.33
+importlib_metadata==9.0.0
+ipykernel==6.29.5
+ipython==8.29.0
+itsdangerous==2.2.0
+jedi==0.19.1
+Jinja2==3.1.6
+jupyter_client==8.6.3
+jupyter_core==5.7.2
+MarkupSafe==3.0.3
+matplotlib-inline==0.1.7
+multitasking==0.0.12
+narwhals==2.18.1
+nest-asyncio==1.6.0
+numpy==2.3.5
+outcome==1.3.0.post0
+packaging==24.1
+pandas==2.3.3
+parso==0.8.4
+peewee==3.18.3
+pexpect==4.9.0
+pillow==12.0.0
+platformdirs==4.3.6
+plotly==6.6.0
+prompt_toolkit==3.0.48
+protobuf==6.33.1
+psutil==6.1.0
+ptyprocess==0.7.0
+pure_eval==0.2.3
+pycparser==2.23
+Pygments==2.18.0
+PySocks==1.7.1
+python-dateutil==2.9.0.post0
+pytz==2025.2
+pyzmq==26.2.0
+requests==2.32.5
+retrying==1.4.2
+selenium==4.25.0
+setuptools==82.0.1
+six==1.16.0
+sniffio==1.3.1
+sortedcontainers==2.4.0
+soupsieve==2.8
+sqlparse==0.5.3
+stack-data==0.6.3
+tornado==6.4.1
+traitlets==5.14.3
+trio==0.26.2
+trio-websocket==0.11.1
+typing_extensions==4.12.2
+tzdata==2025.2
+urllib3==2.2.3
+wcwidth==0.2.13
+websocket-client==1.8.0
+websockets==15.0.1
+Werkzeug==3.1.7
+wsproto==1.2.0
+yfinance==0.2.66
+zipp==3.23.0
+# ── Added for Tab 6 export formats ──────────────────────────────────────────
+openpyxl>=3.1.0
+python-docx>=0.8.11
+# ── AI / LLM stack (HuggingFace + LangChain) ────────────────────────────────
+langchain>=0.3.0,<0.4
+langchain-huggingface>=0.1.0,<0.2
+langgraph>=0.2.0,<0.3
+huggingface_hub>=0.24.0,<1.0
