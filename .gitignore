@@ -20,9 +20,12 @@ env/
 ENV/
 
 # Data and outputs (exclude from version control)
+data/chroma_db/
+data/summaries.db
 data/sentinel_state.json
 raw_ingest/*.json
 output/
+outputs/
 test_outputs/
 q2_solution/outputs/
 q2_solution/test_outputs/

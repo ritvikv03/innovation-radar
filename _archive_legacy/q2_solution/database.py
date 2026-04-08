@@ -77,6 +77,26 @@ class SignalDatabase:
                 ON signals(entities)
             """)
 
+            # ── Radar position history table (added for Dot-Shift tracking) ──
+            # Records each signal's time_horizon + disruption_score per pipeline run.
+            # Allows the dashboard to draw migration arrows when a signal shifts
+            # from a 36-month zone to 24- or 12-month over successive runs.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS signal_positions (
+                    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                    signal_title     TEXT    NOT NULL,
+                    primary_dimension TEXT   NOT NULL,
+                    time_horizon     TEXT    NOT NULL,
+                    disruption_score REAL,
+                    snapshot_date    TEXT    NOT NULL,
+                    created_at       TEXT    DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_positions_title
+                ON signal_positions(signal_title, snapshot_date)
+            """)
+
             conn.commit()
 
     @contextmanager
@@ -353,6 +373,89 @@ class SignalDatabase:
         with self._get_connection() as conn:
             conn.execute("DELETE FROM signals")
             conn.commit()
+
+    # ------------------------------------------------------------------
+    # Radar position history — Dot-Shift tracking
+    # ------------------------------------------------------------------
+
+    def record_radar_snapshot(self, signal_list: List[Dict]) -> int:
+        """
+        Save a snapshot of the current radar positions to signal_positions.
+
+        Call this after each pipeline run so the dashboard can later compare
+        how signals have migrated between time-horizon rings.
+
+        Args:
+            signal_list: List of dicts with at minimum:
+                - title (str)
+                - primary_dimension (str)
+                - time_horizon (str)  — '12_MONTH' | '24_MONTH' | '36_MONTH'
+                - disruption_score (float, optional)
+
+        Returns:
+            Number of rows inserted.
+        """
+        snapshot_date = datetime.now().date().isoformat()
+        inserted = 0
+        with self._get_connection() as conn:
+            for sig in signal_list:
+                title = sig.get('title', '')
+                dimension = sig.get('primary_dimension', 'UNKNOWN')
+                horizon = sig.get('time_horizon', '36_MONTH')
+                score = sig.get('disruption_score')
+                if not title:
+                    continue
+                conn.execute(
+                    """
+                    INSERT INTO signal_positions
+                        (signal_title, primary_dimension, time_horizon,
+                         disruption_score, snapshot_date)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (title, dimension, horizon, score, snapshot_date),
+                )
+                inserted += 1
+            conn.commit()
+        return inserted
+
+    def get_radar_history(self, signal_title: str) -> List[Dict]:
+        """
+        Return all recorded positions for a specific signal, ordered by date.
+
+        Args:
+            signal_title: Exact signal title string.
+
+        Returns:
+            List of dicts with snapshot_date, time_horizon, disruption_score.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT snapshot_date, time_horizon, disruption_score
+                FROM signal_positions
+                WHERE signal_title = ?
+                ORDER BY snapshot_date ASC
+                """,
+                (signal_title,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_all_radar_history(self) -> List[Dict]:
+        """
+        Return every recorded position for all signals, ordered by date.
+
+        Useful for bulk migration analysis in the dashboard.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT signal_title, primary_dimension,
+                       snapshot_date, time_horizon, disruption_score
+                FROM signal_positions
+                ORDER BY signal_title, snapshot_date ASC
+                """
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_database_stats(self) -> Dict:
         """

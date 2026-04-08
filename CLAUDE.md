@@ -1,82 +1,223 @@
-# CLAUDE.md: Sentinel Architecture & Project Rules
+# CLAUDE.md — Fendt PESTEL-EL Sentinel: Enterprise Architecture Rules
 
-This document serves as the technical source of truth and operational guide for the Fendt PESTEL-EL Sentinel.
-
----
-
-## 🎯 Strategic Context
-The system is built for AGCO/Fendt to predict agricultural trends by mapping interdependencies in the **PESTEL-EL** framework.
-
-### The 8 Pillars
-1.  **Political**: Policies, trade, elections.
-2.  **Economic**: Prices, subsidies, interest rates.
-3.  **Social**: Sentiment, protests, labor.
-4.  **Technological**: R&D, digitalization.
-5.  **Environmental**: Climate, weather, emissions.
-6.  **Legal**: EU Laws (EUR-Lex), compliance.
-7.  **Innovation**: Product launches, patents.
-8.  **Social Media**: Influencer trends, viral "buzzwords".
+This is the single source of truth for how this codebase is structured, what each module owns, and how to develop against it correctly.
 
 ---
 
-## 🤖 Agent Architectures (Native Claude Code)
+## Strategic Context
 
-The Fendt Sentinel has migrated from standalone Python scripts and `n8n` to a **Native Claude Code multi-agent architecture**. Sub-agents are stored in `.claude/agents/` and skills in `.claude/skills/`.
-
-### 1. Scout Agent (`scout.md`)
-- **Primary Tool**: Firecrawl MCP Server, Tavily MCP Server.
-- **Defense**: Implements rate-limiting and validates live URLs.
-- **Target**: Live EU agricultural news, EUR-Lex, Eurostat (SDMX), FAOSTAT, AgriPulse.
-
-### 2. The Router Agent (`router.md` - Phase 2)
-- **Role**: Ingests data from the Scout and routes it to specialized PESTEL analysts based on the primary dimension detected.
-
-### 3. PESTEL Analyst Agents (Phase 2 Roadmap)
-Instead of a single analyst, the platform utilizes specialized expert analysts stored in `.claude/agents/`:
-- `political-analyst.md`, `economic-analyst.md`, `social-analyst.md`
-- `tech-analyst.md`, `environmental-analyst.md`, `legal-analyst.md`
-- **Primary Tool**: `q2_solution/database.py` (SQLite temporal momentum tracking), `graph_utils.py`.
-- **Normalization**: Translates content to English but preserves original quotes.
-
-### 4. Critic Agent (`critic.md`)
-- **Primary Tool**: Audit functions via Bash.
-- **Compliance**: Enforces **EU Data Act 2026**.
-- **Audit**: Every edge must have `source_url` and `exact_quote` (min 10 chars).
-
-### 5. Writer Agent (`writer.md`)
-- **Output**: Strategic briefs in Markdown.
-- **Logic**: Generates board-ready R&D portfolios based on high disruption scores.
+The **Fendt PESTEL-EL Sentinel** is a production intelligence platform for AGCO/Fendt. It monitors macro-environmental signals across six PESTEL dimensions, scores them with AI, stores them in a vector database, and presents them in a C-suite Dash dashboard.
 
 ---
 
-## ⚡ Custom Skills & Capabilities
+## Repository Map
 
-*   **/score-disruption `text`**: A custom Claude Code skill that pipes raw text through `q2_solution/cli_scorer.py` to calculate a mathematical Disruption Score based on Novelty, Impact, and Velocity.
-*   **Temporal Velocity Analytics**: Disruption scores factor in mathematical momentum derived from SQLite historical queries, rather than static sentiment analysis.
+```
+innovation-radar/
+├── app.py                   — Primary Dash app (Gemini chat + Plotly visualisations)
+├── app_dash.py              — Premium Dash war-room dashboard (DBC layout)
+├── run_pipeline.py          — CLI: score text or URL, persist to ChromaDB
+├── run_daily_intelligence.sh — Cron wrapper for scheduled pipeline runs
+│
+├── core/                    — THE SINGLE SOURCE OF TRUTH for all data + AI logic
+│   ├── __init__.py
+│   ├── database.py          — ChromaDB façade + Signal Pydantic model
+│   ├── pipeline.py          — Gemini scoring pipeline (raw text → Signal)
+│   ├── scraper.py           — RSS / HTML / EC Press API scraping
+│   ├── sources.py           — PESTEL source registry (single list of URLs)
+│   ├── scheduler.py         — APScheduler background engine (6-hour cycle)
+│   ├── summary_engine.py    — Gemini summaries with SQLite persistence + fallback
+│   ├── logger.py            — Centralised rotating file + console logger
+│   └── utils.py             — retry_with_backoff (shared across all modules)
+│
+├── data/
+│   └── chroma_db/           — ChromaDB persistent store (DO NOT manually edit)
+│
+├── assets/                  — Dash CSS/JS static assets
+├── lib/                     — Third-party frontend bundles (vis.js, tom-select)
+├── logs/                    — Rotating log files (agent.log)
+├── output/ / outputs/       — Generated reports and exports
+├── raw_ingest/              — Scraped article JSON staged for pipeline
+├── tests/                   — Pytest test suite
+└── docs/
+    └── autopsy-architecture.md — Historical defect record (read-only reference)
+```
 
-## 📊 Knowledge Graph Logic (`graph_utils.py`)
-
-*   **Temporal Decay**: 90-day half-life. Edges lose weight daily automatically. Edges < 0.05 are pruned.
-*   **Provenance Defense**: No relationship is valid without a source URL and verbatim quote.
-*   **Multi-Edge Support**: One pair of nodes can have multiple evidence edges.
+**`_archive_legacy/`** — Contains old `q2_solution/` code. Never import from it. Never add to it. It is read-only archaeology.
 
 ---
 
-## 🔐 Security & Operations
+## Core Data Model
 
-### Authentication Method
-- **Guide**: See [authentication.md](authentication.md) for full setup instructions.
-- **OAuth (Claude Pro)**: Preferred. Free and supports multi-agent `claude code` usage.
-- **Mounting**: The host's `~/.claude` is mounted to `/home/node/.claude` (ensure write local permissions).
+All intelligence flows through one canonical model. Never invent parallel data structures.
 
-### Compliance Checklist (EU Data Act 2026)
-- **Data Minimization**: No PII allowed.
-- **Transparency**: Every claim is traceable to a source.
-- **Quality**: Decay ensures stale data doesn't drive decisions.
+```python
+# core/database.py
+
+class PESTELDimension(str, Enum):
+    POLITICAL | ECONOMIC | SOCIAL | TECHNOLOGICAL | ENVIRONMENTAL | LEGAL
+
+class Signal(BaseModel):
+    id: str                          # UUID, auto-generated
+    title: str                       # 5–300 chars
+    pestel_dimension: PESTELDimension
+    content: str                     # 20+ chars, English synthesis
+    source_url: str                  # verbatim provenance URL (REQUIRED)
+    impact_score: float              # 0.0–1.0
+    novelty_score: float             # 0.0–1.0
+    velocity_score: float            # 0.0–1.0 (temporal momentum)
+    date_ingested: datetime          # UTC, auto-set
+    entities: list[str]              # extracted named entities
+```
+
+**The disruption score** is derived from these three sub-scores. No signal is valid without all three.
 
 ---
 
-## 🛠️ Development Rules
-- **Python**: Use `networkx` for graph operations and `sqlite3` for temporal momentum tracking.
-- **MCP Servers**: Live internet access MUST go through configured `.mcp.json` servers (e.g., Firecrawl, Tavily).
-- **Documentation**: Don't create new `.md` files in the root. Update `README.md` or `QUICKSTART.md`. Keep the repo clean.
+## Storage Architecture
+
+**One vector database. One embedding model. No alternatives.**
+
+| Concern | Solution |
+|---------|----------|
+| Signal storage | ChromaDB at `data/chroma_db/` |
+| Embedding model | `all-MiniLM-L6-v2` via ChromaDB (offline, no API key) |
+| Summary persistence | SQLite via `SummaryEngine` (summary cache only) |
+| Dashboard cache | `SummaryEngine.get_latest()` — never re-hit Gemini on page reload |
+
+**Rules:**
+- All reads/writes go through `SignalDB` in `core/database.py`. Never call ChromaDB directly from app code.
+- `@vercel/postgres`, SQLite for signals, or any second vector store are forbidden. ChromaDB is the store.
+- The `_archive_legacy/` SQLite databases (`signals.db`, `sentinel.db`) are dead. Do not reference them.
+
+---
+
+## AI Layer
+
+**One LLM: Google Gemini. One model: `gemini-2.5-flash-lite`.**
+
+| Task | Module | How |
+|------|--------|-----|
+| Score raw article text → Signal | `core/pipeline.py` | `score_text(text)` or `score_and_save(text, db)` |
+| Generate BLUF executive summary | `core/summary_engine.py` | `SummaryEngine.generate(...)` with `fallback_fn` |
+| Dashboard chat (Inquisition) | `app.py` | Direct `genai` call inside callback |
+
+**Rules:**
+- Always provide a `fallback_fn` to `SummaryEngine.generate()`. Gemini quota errors must never crash the UI.
+- The Gemini model string is `"gemini-2.5-flash-lite"`. Do not upgrade it without testing quota limits.
+- `GeminiScoreResponse` in `core/pipeline.py` is the strict Pydantic validation layer between raw LLM JSON and a `Signal`. Never skip it.
+- Never call `genai.configure()` more than once per process. The app-level call in `app.py` is authoritative.
+
+---
+
+## Frontend Architecture
+
+**Framework: Dash + Dash Bootstrap Components (DBC). Charts: Plotly.**
+
+| App | Purpose |
+|-----|---------|
+| `app.py` | Primary app: signal feed, Gemini chat, radar chart |
+| `app_dash.py` | Premium war-room: full DBC layout, DataTable, tabs |
+
+**Rules:**
+- All Dash callbacks must be pure functions — no global state mutation inside a callback.
+- Use `no_update` to avoid unnecessary re-renders. Never return `None` where a component is expected.
+- DBC layout: use `dbc.Container → dbc.Row → dbc.Col` for all grid structure. No ad-hoc `html.Div` grids.
+- Plotly figures must have `template="plotly_dark"` and `paper_bgcolor="rgba(0,0,0,0)"` for the dark war-room aesthetic.
+- Never block the main thread inside a callback. Heavy work (Gemini calls, DB queries) must use `no_update` optimistically and update on a second callback pass, or accept the latency explicitly.
+
+---
+
+## Scraping & Intelligence Pipeline
+
+**Flow:** `sources.py` → `scraper.py` → `pipeline.py` → `database.py`
+
+```
+PESTEL_SOURCES list
+    → _scrape_rss() / _scrape_page() / _scrape_ec_press()  [scraper.py]
+    → ScrapedArticle { url, text }
+    → score_and_save(text, db)                              [pipeline.py]
+    → GeminiScoreResponse (Pydantic validation)
+    → Signal (validated, UUID, scores)
+    → SignalDB.insert()                                     [database.py]
+```
+
+**Rules:**
+- All new sources go in `core/sources.py` in the `PESTEL_SOURCES` list. Never hardcode URLs in scrapers or the scheduler.
+- `scrape_mode` must be one of: `"rss"`, `"page"`, `"api_ec_press"`. Adding a new mode requires a corresponding handler in `scraper.py`.
+- Every `ScrapedArticle` must have a non-empty `source_url`. This propagates to `Signal.source_url` — the EU Data Act 2026 provenance requirement.
+- All external HTTP calls use `retry_with_backoff` from `core/utils.py`. Never use a bare `requests.get()` without retry logic.
+
+---
+
+## Scheduler
+
+`core/scheduler.py` runs the Scout cycle every 6 hours via APScheduler.
+
+- Access health state from anywhere: `from core.scheduler import HEALTH, engine`
+- `HEALTH` is a module-level dict. Read it; never write to it from outside `scheduler.py`.
+- The scheduler starts automatically when `app.py` imports `engine`. Do not call `engine.start()` twice.
+- Heartbeat fires every 30 seconds. Do not reduce this interval — it keeps the UI health badge live.
+
+---
+
+## Logging
+
+```python
+from core.logger import get_logger
+log = get_logger(__name__)
+```
+
+- Call `get_logger(__name__)` once at module top-level. Never use `print()` for operational output.
+- Logs write to `logs/agent.log` (rotating, 5 MB × 3 backups) and to stderr.
+- Override console level with `LOG_LEVEL=DEBUG|INFO|WARNING|ERROR`.
+- Never call `logging.basicConfig()` — `core/logger.py` owns root handler configuration.
+
+---
+
+## Development Rules
+
+### Python Standards
+- **Python 3.11+**. Use `from __future__ import annotations` in every module.
+- **Pydantic v2** for all data models. Use `model_validate()`, not the deprecated `parse_obj()`.
+- **Type annotations** on all public functions. Return types are mandatory.
+- No bare `except:` clauses. Catch specific exception types.
+- Use `Path` (pathlib) for all file paths. No `os.path.join()`.
+
+### Package Boundaries
+- `core/` is the domain layer. It must have **zero imports from `app.py` or `app_dash.py`**.
+- `app.py` and `app_dash.py` may import from `core/`. They may not import from each other.
+- `run_pipeline.py` is a CLI thin wrapper. It imports from `core/` only.
+- Never add business logic inside a Dash callback. Callbacks call `core/` functions.
+
+### Environment Variables
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `GEMINI_API_KEY` | Yes | Gemini scoring + summaries |
+| `FIRECRAWL_API_KEY` | Optional | HTML page scraping (falls back to `requests`) |
+| `LOG_LEVEL` | Optional | Console log verbosity (default: `INFO`) |
+
+Load via `python-dotenv` at app entry points. Never hardcode keys. Never commit `.env`.
+
+### Testing
+- Tests live in `tests/`. Run with `pytest`.
+- Test `core/` modules in isolation. Mock `genai` and ChromaDB in unit tests.
+- Do not test Dash callbacks directly — test the underlying `core/` functions they call.
+
+### Repository Hygiene
+- Do not create new `.md` files in the repo root. Update `README.md` only.
+- `docs/autopsy-architecture.md` is a read-only historical record. Do not modify it.
+- `_archive_legacy/` is frozen. No imports, no edits, no additions.
+- `data/chroma_db/` is gitignored. Never commit database files.
+- `logs/` is gitignored. Never commit log files.
+
+---
+
+## EU Data Act 2026 Compliance
+
+Every `Signal` persisted to ChromaDB must have:
+1. `source_url` — a valid, non-empty URL pointing to the original article.
+2. `content` — minimum 20 characters of synthesised text (not just a headline).
+3. No PII — entities are organisation/product names only, never personal names tied to private individuals.
+
+The Critic review is enforced at pipeline validation time via `GeminiScoreResponse` and `Signal` Pydantic validators. If either fails, the signal is rejected and logged at `ERROR` — it is never silently dropped.

@@ -250,18 +250,33 @@ def generate_bluf_narrative(db_stats: Dict, signals: List[Dict]) -> str:
     Returns:
         str: 3-sentence BLUF narrative
     """
+    # Guard: empty signal list must never crash — return a clear action prompt
+    if not signals:
+        return (
+            "No disruption signals are currently loaded in the database. "
+            "Run the pipeline to generate intelligence: `python sentinel.py --run-once`. "
+            "Once signals are ingested, this briefing will update automatically."
+        )
+
     api_key = get_api_key()
 
     # Analyze signal distribution
     df = pd.DataFrame(signals)
 
-    # Count by dimension
-    dimension_counts = df['primary_dimension'].value_counts().to_dict()
-    top_dimension = max(dimension_counts, key=dimension_counts.get)
-    top_dimension_pct = (dimension_counts[top_dimension] / len(df)) * 100
+    # Count by dimension — safe even if column has mixed/missing values
+    dimension_counts = df['primary_dimension'].dropna().value_counts().to_dict()
+    if not dimension_counts:
+        top_dimension, top_dimension_pct = "Unknown", 0.0
+    else:
+        top_dimension = max(dimension_counts, key=dimension_counts.get)
+        top_dimension_pct = (dimension_counts[top_dimension] / len(df)) * 100
 
-    # Count by severity
-    severity_counts = df['disruption_classification'].value_counts().to_dict()
+    # Count by severity — column may not exist in older schema
+    severity_col = 'disruption_classification'
+    if severity_col in df.columns:
+        severity_counts = df[severity_col].dropna().value_counts().to_dict()
+    else:
+        severity_counts = {}
     critical_count = severity_counts.get('CRITICAL', 0)
     high_count = severity_counts.get('HIGH', 0)
 
@@ -318,9 +333,16 @@ AVERAGE SCORES: Impact {avg_impact:.2f} | Velocity {avg_velocity:.2f} | Novelty 
 TOP CRITICAL THREAT: {top_threat}"""
 
     prompt = (
-        "You are a strategic advisor delivering a BLUF briefing to AGCO/Fendt's senior leadership. "
-        "Analyze the data below and write EXACTLY 3 hard-hitting, data-driven sentences. "
-        "No preamble, no titles, no bullet points — ONLY the 3 sentences.\n\n"
+        "You are a strategic advisor delivering a BLUF (Bottom Line Up Front) briefing "
+        "to AGCO/Fendt's C-suite. Using ONLY the statistical data provided below — "
+        "no external knowledge, no fabricated URLs, no invented company names or figures — "
+        "write EXACTLY 3 hard-hitting sentences:\n"
+        "Sentence 1: The headline finding — what the data shows right now.\n"
+        "Sentence 2: The strategic insight — what this PESTEL pattern means specifically "
+        "for AGCO/Fendt's competitive position, revenue, and R&D roadmap.\n"
+        "Sentence 3: The single most important C-suite action derived strictly from the data.\n"
+        "Rules: No preamble. No titles. No bullet points. No URLs. No fabricated facts. "
+        "ONLY the 3 sentences.\n\n"
         f"{context}"
     )
 
@@ -622,70 +644,93 @@ with tab1:
 
         st.markdown("---")
 
-        # Critical Disruptions Section
-        st.markdown("### 🚨 Top 3 Critical Disruptions")
+        # ─── Top 3 Critical Disruptions ────────────────────────────────────
+        st.markdown("### 🚨 Top 3 Highest-Priority Signals")
         st.markdown("""
         <div style='padding: 10px 14px; background: rgba(255,75,75,0.06); border-radius: 6px; margin-bottom: 10px; border-left: 3px solid rgba(255,75,75,0.5);'>
             <p style='color: #aaa; margin: 0; font-size: 13px;'>
-            Signals classified as <b>CRITICAL</b> (composite disruption score in the top tier, immediate 0–12 month horizon).
-            Ranked by Impact score. Each card shows the signal's content excerpt, source link, and individual
-            Impact / Novelty / Velocity sub-scores. These are the three signals most likely to require
-            a strategic response from senior leadership in the near term.
+            <b>Selection criteria:</b> All <span style='color:#ff4b4b;'>CRITICAL</span> signals are considered first (composite disruption score ≥ 0.70),
+            then <span style='color:#ff9933;'>HIGH</span> signals (score ≥ 0.50) fill remaining slots.
+            Within each tier, signals are ranked by <b>Impact Score</b> — the direct magnitude of disruption
+            on Fendt's market, regulatory environment, or supply chain.
+            These three signals require immediate C-suite attention.
             </p>
         </div>
         """, unsafe_allow_html=True)
 
-        critical_signals = df[df['disruption_classification'] == 'CRITICAL'].to_dict('records')
+        # Build pool: CRITICAL first, then HIGH; sorted by impact within each tier
+        _severity_rank = {'CRITICAL': 0, 'HIGH': 1}
+        top_pool = df[df['disruption_classification'].isin(['CRITICAL', 'HIGH'])].copy()
+        if not top_pool.empty:
+            top_pool['_sev_rank'] = top_pool['disruption_classification'].map(_severity_rank).fillna(2)
+            top_pool['_impact'] = top_pool['impact_score'].fillna(0)
+            top_pool = top_pool.sort_values(['_sev_rank', '_impact'], ascending=[True, False])
+            top_signals = top_pool.drop(columns=['_sev_rank', '_impact']).to_dict('records')
+        else:
+            top_signals = []
 
-        if critical_signals:
-            # Sort by impact score (descending)
-            critical_signals.sort(
-                key=lambda x: x.get('impact_score', 0) if x.get('impact_score') is not None else 0,
-                reverse=True
-            )
+        _rank_emoji = {0: '🥇', 1: '🥈', 2: '🥉'}
+        _sev_badge = {'CRITICAL': ('🔴', '#ff4b4b'), 'HIGH': ('🟠', '#ff9933')}
 
-            # Show top 3 with detailed view
-            for i, signal in enumerate(critical_signals[:3]):  # Show top 3
+        if top_signals:
+            for i, signal in enumerate(top_signals[:3]):
+                sev = signal.get('disruption_classification', 'HIGH')
+                sev_icon, sev_color = _sev_badge.get(sev, ('⚪', '#aaa'))
+                rank = _rank_emoji.get(i, f'#{i+1}')
+                impact = signal.get('impact_score') or 0
+                novelty = signal.get('novelty_score') or 0
+                velocity = signal.get('velocity_score') or 0
+                comp_score = round(impact * 0.5 + novelty * 0.3 + velocity * 0.2, 3)
+
+                st.markdown(
+                    f"<div style='padding:2px 0 4px 0;'>"
+                    f"<span style='font-size:13px;color:#888;'>{rank} Rank {i+1} — "
+                    f"Selected because: {sev} severity "
+                    f"(composite score {comp_score:.3f}) · Impact {impact:.2f} highest in tier</span>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
                 with st.expander(
-                    f"🔴 {signal['title']} [{signal['primary_dimension']}]",
-                    expanded=(i < 3)  # Expand first 3
+                    f"{sev_icon} {signal['title']} [{signal['primary_dimension']}]",
+                    expanded=(i == 0),
                 ):
                     col_a, col_b = st.columns([2, 1])
-
                     with col_a:
-                        st.markdown(f"**Source:** [{signal['source']}]({signal['url']})")
-                        st.markdown(f"**Date:** {signal['date_ingested']}")
-                        st.caption(signal['content'][:500] + "..." if len(signal['content']) > 500 else signal['content'])
-
+                        st.markdown(f"**Source:** [{signal.get('source', 'N/A')}]({signal.get('url', '#')})")
+                        st.markdown(f"**Date:** {signal.get('date_ingested', 'N/A')}")
+                        content = signal.get('content', '')
+                        st.caption(content[:500] + "…" if len(content) > 500 else content)
                     with col_b:
                         st.metric(
-                            "Impact",
-                            f"{signal.get('impact_score', 0):.2f}",
-                            help="Impact (0.0-1.0) measures magnitude. Calculated algorithmically based on cross-PESTEL reach (how many dimensions the signal affects) and high-leverage triggers like legal mandates or tech breakthroughs. Crucial for flagging existential industry threats."
+                            "Impact", f"{impact:.2f}",
+                            help="Impact (0.0–1.0): Magnitude of disruption, calculated from cross-PESTEL reach and high-leverage triggers (legal mandates, technology breakthroughs, subsidy changes)."
                         )
                         st.metric(
-                            "Novelty",
-                            f"{signal.get('novelty_score', 0):.2f}",
-                            help="Novelty (0.0-1.0) measures uniqueness. Calculated via inverse-similarity text matching against historical signals in the SQLite database. Crucial for separating true emerging anomalies from repetitive background noise."
+                            "Novelty", f"{novelty:.2f}",
+                            help="Novelty (0.0–1.0): Uniqueness vs. existing database entries via text-similarity matching. High novelty = new type of signal not previously seen by the Sentinel."
                         )
                         st.metric(
-                            "Velocity",
-                            f"{signal.get('velocity_score', 0):.2f}",
-                            help="Velocity (0.0-1.0) measures acceleration. Derived mathematically by comparing recent 30-day signal volume against the trailing 6-month historical average. Crucial to prove a trend is actively gaining momentum, rather than just being a one-off event."
+                            "Velocity", f"{velocity:.2f}",
+                            help="Velocity (0.0–1.0): Momentum — 30-day vs. 6-month historical signal-volume ratio. High velocity = topic actively accelerating."
+                        )
+                        st.metric(
+                            "Comp. Score", f"{comp_score:.3f}",
+                            help="Composite disruption score = Impact×0.5 + Novelty×0.3 + Velocity×0.2. Drives severity classification: CRITICAL ≥ 0.70 · HIGH ≥ 0.50."
                         )
 
-            # Show remaining critical signals count
-            if len(critical_signals) > 3:
-                st.info(f"ℹ️ **{len(critical_signals) - 3} additional critical signals** detected. View all in the Live Signal Feed tab.")
+            remaining = len(top_signals) - 3
+            if remaining > 0:
+                st.info(f"ℹ️ **{remaining} additional CRITICAL/HIGH signals** detected. View all in the PESTEL Signal Monitor tab.")
         else:
-            st.success("✅ No critical disruptions detected. System is monitoring for emerging threats.")
+            st.success("✅ No CRITICAL or HIGH disruptions detected. Sentinel is actively monitoring for emerging threats.")
 
 # ===========================
 # TAB 2: INNOVATION RADAR
 # ===========================
 
 with tab2:
-    st.subheader("Innovation Radar - Industry Disruption Map")
+    st.subheader("Innovation Radar — Industry Disruption Map")
 
     if not signals:
         _empty_state(
@@ -694,36 +739,71 @@ with tab2:
             "Run the daily intelligence sweep to populate the radar: <code>python sentinel.py --run-once</code>"
         )
     else:
-        st.markdown("""
-        **Time Horizons:**
-        - 🔴 **12 Month**: Immediate action required
-        - 🟡 **24 Month**: Pilot and trial phase
-        - 🟢 **36 Month**: Assess and monitor
+        # ── Legend & time-horizon tooltip ────────────────────────────────
+        leg_col, info_col = st.columns([2, 1])
+        with leg_col:
+            st.markdown("""
+            **Ring color = Time Horizon (urgency):**  🔴 **12 Month** — act now  ·  🟡 **24 Month** — pilot phase  ·  🟢 **36 Month** — monitor
+            """)
+        with info_col:
+            st.markdown(
+                "<span title='How is the time horizon determined?&#10;&#10;"
+                "The Sentinel maps each signal&apos;s composite disruption score "
+                "to a time horizon ring:&#10;"
+                "• CRITICAL (score ≥ 0.70) → 🔴 12 Month ring. "
+                "These signals represent immediate threats — regulatory enforcement, "
+                "competitor launches, or subsidy cuts happening within 12 months.&#10;"
+                "• HIGH (score ≥ 0.50) → 🟡 24 Month ring. "
+                "Signals entering the go/no-go window — begin pilot programs now.&#10;"
+                "• MODERATE / LOW (score < 0.50) → 🟢 36 Month ring. "
+                "Emerging trends to track; not yet requiring capital allocation.&#10;&#10;"
+                "Score formula: Impact×0.5 + Novelty×0.3 + Velocity×0.2'>"
+                "ℹ️ <u style='cursor:help;color:#00ccff;'>How is Time Horizon assigned?</u></span>",
+                unsafe_allow_html=True,
+            )
 
-        **Sectors** (8 PESTEL-EL pillars): Political · Economic · Social · Technological · Environmental · Legal · Innovation · Social Media
-        """)
+        # Dimension filter — strict 6 PESTEL; deprecated tags remapped automatically
+        _STRICT_PESTEL = {'POLITICAL', 'ECONOMIC', 'SOCIAL', 'TECHNOLOGICAL', 'ENVIRONMENTAL', 'LEGAL'}
+        _DEPRECATED_REMAP = {'INNOVATION': 'TECHNOLOGICAL', 'SOCIAL_MEDIA': 'SOCIAL'}
 
-        # Dimension filter widget
         df_radar = pd.DataFrame(signals)
-        available_dimensions = sorted(df_radar['primary_dimension'].unique().tolist())
+        # Remap deprecated dim values before filtering so old DB entries still appear
+        df_radar['primary_dimension'] = df_radar['primary_dimension'].apply(
+            lambda d: _DEPRECATED_REMAP.get(d, d)
+        )
+        available_dimensions = sorted(
+            [d for d in df_radar['primary_dimension'].unique() if d in _STRICT_PESTEL]
+        )
+        # Warn user if deprecated tags were remapped
+        deprecated_found = [s.get('primary_dimension') for s in signals
+                            if s.get('primary_dimension') in _DEPRECATED_REMAP]
+        if deprecated_found:
+            _dep_counts = {}
+            for t in deprecated_found:
+                _dep_counts[t] = _dep_counts.get(t, 0) + 1
+            _dep_msg = ', '.join(f"{t} → {_DEPRECATED_REMAP[t]} ({n})" for t, n in _dep_counts.items())
+            st.caption(f"ℹ️ Deprecated dimension tags auto-remapped: {_dep_msg}")
 
         selected_dimensions = st.multiselect(
-            "🎛️ Filter by PESTEL Dimension",
+            "🎛️ Filter by PESTEL Dimension (strict 6)",
             options=available_dimensions,
             default=available_dimensions,
-            help="Select which PESTEL dimensions to display on the radar. Deselect to focus on specific areas."
+            help="Standard PESTEL: Political · Economic · Social · Technological · Environmental · Legal. "
+                 "Legacy INNOVATION and SOCIAL_MEDIA tags are remapped automatically."
         )
 
         if not selected_dimensions:
             st.warning("Please select at least one dimension to display the radar.")
         else:
-            # Prepare signals for radar
+            # Prepare signals for radar — apply deprecated tag remap
             radar_signals = []
-            # Filter signals by selected dimensions
-            filtered_signals = [sig for sig in signals if sig['primary_dimension'] in selected_dimensions]
+            filtered_signals = [
+                sig for sig in signals
+                if _DEPRECATED_REMAP.get(sig['primary_dimension'], sig['primary_dimension'])
+                   in selected_dimensions
+            ]
 
             for sig in filtered_signals:
-                # Map disruption classification to time horizon
                 classification = sig.get('disruption_classification', 'LOW')
                 if classification == 'CRITICAL':
                     horizon = '12_MONTH'
@@ -732,19 +812,20 @@ with tab2:
                 else:
                     horizon = '36_MONTH'
 
-                # Calculate composite disruption score
-                impact = sig.get('impact_score', 0) if sig.get('impact_score') is not None else 0
-                novelty = sig.get('novelty_score', 0) if sig.get('novelty_score') is not None else 0
-                velocity = sig.get('velocity_score', 0) if sig.get('velocity_score') is not None else 0
-
-                disruption_score = (impact * 0.5 + novelty * 0.3 + velocity * 0.2)
+                impact = sig.get('impact_score') or 0
+                novelty = sig.get('novelty_score') or 0
+                velocity = sig.get('velocity_score') or 0
+                disruption_score = impact * 0.5 + novelty * 0.3 + velocity * 0.2
 
                 radar_signals.append({
                     'title': sig['title'],
-                    'primary_dimension': sig['primary_dimension'],
+                    'primary_dimension': _DEPRECATED_REMAP.get(
+                        sig['primary_dimension'], sig['primary_dimension']
+                    ),
                     'time_horizon': horizon,
                     'disruption_score': disruption_score,
-                    'classification': classification
+                    'classification': classification,
+                    'url': sig.get('url', ''),
                 })
 
             # Generate radar
@@ -755,6 +836,71 @@ with tab2:
             except Exception as e:
                 st.error(f"Error generating radar: {str(e)}")
                 st.info("Ensure plotly is installed: pip install plotly")
+
+            # ── Dot-Shift History ────────────────────────────────────────
+            st.markdown("---")
+            st.markdown("#### 🕐 Dot-Shift History — Radar Migration Tracking")
+
+            # Auto-save current snapshot to the DB (idempotent: same date = deduplicated later)
+            _snapshot_saved = False
+            try:
+                _db_for_snapshot = get_db()
+                _saved_count = _db_for_snapshot.record_radar_snapshot(radar_signals)
+                _snapshot_saved = True
+            except Exception:
+                pass
+
+            # Check how many distinct snapshot dates are recorded
+            try:
+                _all_history = get_db().get_all_radar_history()
+                _snapshot_dates = sorted({r['snapshot_date'] for r in _all_history})
+            except Exception:
+                _all_history = []
+                _snapshot_dates = []
+
+            if len(_snapshot_dates) >= 2:
+                # Identify signals that changed time horizon across runs
+                _by_title: Dict[str, List] = {}
+                for r in _all_history:
+                    _by_title.setdefault(r['signal_title'], []).append(r)
+
+                migrations = []
+                for title, history in _by_title.items():
+                    horizons = [h['time_horizon'] for h in history]
+                    if len(set(horizons)) > 1:
+                        migrations.append({
+                            'Signal': title[:80],
+                            'First Seen': history[0]['snapshot_date'],
+                            'First Horizon': history[0]['time_horizon'].replace('_', ' '),
+                            'Latest Horizon': history[-1]['time_horizon'].replace('_', ' '),
+                            'Moved': '⬆️ Escalated' if horizons[-1] < horizons[0]
+                                     else '⬇️ De-escalated',
+                        })
+
+                if migrations:
+                    st.markdown(
+                        f"**{len(migrations)} signal(s) have shifted time-horizon rings** "
+                        f"across {len(_snapshot_dates)} tracked pipeline runs:"
+                    )
+                    st.dataframe(pd.DataFrame(migrations), use_container_width=True, hide_index=True)
+                else:
+                    st.info(
+                        f"No horizon shifts detected yet across {len(_snapshot_dates)} runs. "
+                        "Signals have maintained their time-horizon classification."
+                    )
+            else:
+                st.markdown(
+                    "<div style='padding:10px 14px;background:rgba(0,204,255,0.07);"
+                    "border-radius:6px;border-left:3px solid #00ccff;'>"
+                    "<b style='color:#00ccff;'>📊 Dot-Shift Tracking: Active</b><br>"
+                    "<span style='color:#aaa;font-size:13px;'>"
+                    "This run has been recorded as the baseline snapshot. "
+                    "After each subsequent pipeline run, the system will compare positions "
+                    "and display arrows here showing signals that have moved from "
+                    "36-month → 24-month → 12-month rings (escalation) or the reverse."
+                    "</span></div>",
+                    unsafe_allow_html=True,
+                )
 
             # Signal table with source links
             st.markdown("---")
@@ -804,6 +950,44 @@ with tab2:
                 }
             )
 
+            # ── Outcome & Innovation Definition ───────────────────────────
+            st.markdown("---")
+            with st.expander("📖 Radar Outcomes & Innovation Definition — What does this chart tell us?", expanded=False):
+                st.markdown("""
+                #### What this Radar Measures
+                The Innovation Radar maps **strategic disruption signals** across the six PESTEL dimensions
+                to help AGCO/Fendt leadership understand *where* competitive forces are building and *when* they
+                require a capital allocation decision.
+
+                #### How "Innovation" is Defined Here
+                In this framework, **innovation is not limited to patents or product launches**.
+                A signal is classified as innovation-relevant when it:
+                - Represents a **technology readiness level (TRL) shift** — e.g. a pilot program reaching
+                  commercial scale within the tracking period.
+                - Involves **R&D investment surges** detected in funding data, patent filings, or
+                  academic publication rates.
+                - Represents a **business model disruption** — e.g. a new entrant displacing an incumbent's
+                  go-to-market with a platform or service model.
+
+                Technological signals are captured under the **TECHNOLOGICAL** PESTEL dimension.
+                Regulatory drivers of innovation (e.g. EU mandates forcing electrification) are
+                captured under **LEGAL** or **POLITICAL** — because the force is regulatory, not technological.
+
+                #### Derived Findings from the Current Radar
+                - **Ring density** (many dots in the 12-month ring) = near-term strategic pressure.
+                  Fendt should be in execution mode for these, not discovery mode.
+                - **Quadrant concentration** (many signals in one PESTEL sector) = systemic risk in that
+                  area — e.g. a cluster of ENVIRONMENTAL signals means regulatory exposure is unusually high.
+                - **Score size** (dot radius) = composite disruption magnitude.
+                  Large dots require proportionally larger strategic responses.
+
+                #### What the Radar Does NOT Show
+                - It does not forecast specific dates — horizons are probabilistic windows.
+                - It does not show competitive intelligence about specific rival firms unless
+                  those signals are present in the database.
+                - Source citations are in the signal table below the radar.
+                """)
+
 # ===========================
 # TAB 3: LIVE SIGNAL FEED
 # ===========================
@@ -838,11 +1022,25 @@ with tab3:
     else:
         df = pd.DataFrame(signals)
 
-        # Deduplicate by URL at display time (keep first / most recent occurrence)
-        if 'url' in df.columns:
-            df_deduped = df.drop_duplicates(subset=['url'], keep='first').copy()
-        else:
-            df_deduped = df.copy()
+        # ── Robust deduplication ─────────────────────────────────────────
+        # Priority: highest severity first, then latest ingestion date.
+        # Step 1: deduplicate by URL (exact match)
+        # Step 2: deduplicate by normalised title (case/space-insensitive)
+        # This removes both exact re-ingestions and pipeline double-runs.
+        _SEV_ORDER = {'CRITICAL': 0, 'HIGH': 1, 'MODERATE': 2, 'LOW': 3}
+        df_deduped = df.copy()
+        df_deduped['_sev_rank'] = df_deduped['disruption_classification'].map(_SEV_ORDER).fillna(4)
+        df_deduped = df_deduped.sort_values(
+            ['_sev_rank', 'date_ingested'], ascending=[True, False]
+        )
+        if 'url' in df_deduped.columns:
+            df_deduped = df_deduped.drop_duplicates(subset=['url'], keep='first')
+        if 'title' in df_deduped.columns:
+            df_deduped['_title_norm'] = df_deduped['title'].str.strip().str.lower()
+            df_deduped = df_deduped.drop_duplicates(subset=['_title_norm'], keep='first')
+            df_deduped = df_deduped.drop(columns=['_title_norm'])
+        df_deduped = df_deduped.drop(columns=['_sev_rank'])
+        df_deduped = df_deduped.reset_index(drop=True)
 
         # Search and filter controls
         col_search, col_filter = st.columns([2, 1])
@@ -871,9 +1069,12 @@ with tab3:
             filtered_df = filtered_df[filtered_df['primary_dimension'].isin(dimension_filter)]
 
         duplicates_removed = len(df) - len(df_deduped)
-        caption_parts = [f"Showing {len(filtered_df)} of {len(df_deduped)} signals"]
+        caption_parts = [f"Showing {len(filtered_df)} of {len(df_deduped)} unique signals"]
         if duplicates_removed > 0:
-            caption_parts.append(f"({duplicates_removed} duplicate URLs removed)")
+            caption_parts.append(
+                f"({duplicates_removed} duplicate{'s' if duplicates_removed > 1 else ''} removed "
+                "by URL + title deduplication — highest severity kept)"
+            )
         st.caption(" ".join(caption_parts))
 
         # Display configuration — include URL as clickable link
@@ -1094,13 +1295,14 @@ with tab5:
 
     st.markdown("""
     <div style='padding: 12px 16px; background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 18px; border: 1px solid rgba(255,255,255,0.08);'>
-        <p style='color: #aaaaaa; margin: 0 0 8px 0; font-size: 14px;'><b>How it works:</b></p>
+        <p style='color: #aaaaaa; margin: 0 0 8px 0; font-size: 14px;'><b>How it works — Calculations Explained:</b></p>
         <ul style='color: #888; margin: 0; font-size: 13px; padding-left: 18px;'>
-            <li><b>Nodes</b> represent named entities extracted from intelligence signals — a regulatory policy, a market shift, a technology, or a physical event.</li>
-            <li><b>Edges</b> represent causal relationships between two entities, identified by the Analyst agent from signal content and verbatim quotes. Each edge has a <b>weight</b> (−1.0 to +1.0): positive = one event accelerates or enables the other; negative = one event restricts or counters the other.</li>
-            <li><b>Temporal decay:</b> Edge weights decay with a 90-day half-life — older, unconfirmed relationships automatically lose influence. Edges below 0.05 are pruned.</li>
-            <li><b>Provenance:</b> Every edge must have a verified <code>source_url</code> and an <code>exact_quote</code> from the source (minimum 10 characters) — required for EU Data Act 2026 compliance.</li>
-            <li><b>Color coding</b> (node color = PESTEL dimension; edge color = relationship strength and direction — see legend below the graph).</li>
+            <li><b>Nodes</b> represent named entities extracted from intelligence signals — a regulatory policy, a market shift, a technology, or a physical event. Node color = PESTEL dimension (red=Political, blue=Economic, green=Social, purple=Technological, orange=Environmental, amber=Legal).</li>
+            <li><b>Edges</b> represent causal relationships between two entities, identified by the Analyst agent from signal content and verbatim quotes. Edge <b>weight</b> range −1.0 to +1.0: positive = one event accelerates or enables the other; negative = one event restricts or counters it.</li>
+            <li><b>Distance between nodes</b> is determined by the Barnes-Hut physics simulation: nodes with strong causal links (|weight| close to 1.0) are pulled closer together by stronger spring forces. Weakly linked nodes drift further apart.</li>
+            <li><b>Temporal decay:</b> Edge weights decay with a 90-day half-life — older, unconfirmed relationships automatically lose influence. Edges below 0.05 are pruned from the graph entirely.</li>
+            <li><b>Provenance:</b> Every edge must have a verified <code>source_url</code> and an <code>exact_quote</code> (min 10 characters) — required for EU Data Act 2026 compliance.</li>
+            <li><b>Edge colors:</b> 🟢 Strong positive (>0.5) · 🔵 Moderate positive · 🟠 Moderate negative · 🔴 Strong negative (&lt;−0.5)</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
@@ -1327,6 +1529,72 @@ with tab5:
                 with col_l4:
                     st.markdown("🔴 **Strong Negative** (Weight < -0.5)")
 
+            # ── AI Forecast Extension (inside the main KG try: block) ────
+            st.markdown("---")
+            st.markdown("### 🔮 AI Causal Forecast — Cross-PESTEL Predictions")
+            st.markdown("""
+            <div style='padding: 10px 14px; background: rgba(150,78,163,0.08); border-radius: 6px;
+                        border-left: 3px solid #984ea3; margin-bottom: 10px;'>
+                <p style='color: #aaa; margin: 0; font-size: 13px;'>
+                Based on the verified causal edges currently in the Knowledge Graph, this section uses AI to
+                predict <b>next-level interdependencies</b> — how an existing signal in one PESTEL area
+                will logically propagate to another area. Forecasts are grounded strictly in the
+                existing graph edges; no external sources or fabricated links are introduced.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if st.button("🔮 Generate Cross-PESTEL Forecast", key="kg_forecast_btn"):
+                _forecast_model = _get_gemini_model()
+                if not _forecast_model:
+                    _api_unavailable_state("Cross-PESTEL Forecast")
+                else:
+                    try:
+                        # Build edge context — strictly from existing graph, no invention
+                        _edge_lines = []
+                        for _src, _tgt, _eattrs in list(G.edges(data=True))[:20]:
+                            _src_lbl = G.nodes[_src].get('label', _src)
+                            _src_cat = G.nodes[_src].get('category', 'UNKNOWN')
+                            _tgt_lbl = G.nodes[_tgt].get('label', _tgt)
+                            _tgt_cat = G.nodes[_tgt].get('category', 'UNKNOWN')
+                            _wt = _eattrs.get('weight', 0)
+                            _rel = _eattrs.get('relationship', 'RELATES_TO')
+                            _edge_lines.append(
+                                f"  [{_src_cat}] {_src_lbl} --{_rel}({_wt:+.2f})--> [{_tgt_cat}] {_tgt_lbl}"
+                            )
+
+                        if not _edge_lines:
+                            st.info("No edges in the Knowledge Graph yet. Add causal relationships first.")
+                        else:
+                            _graph_ctx = "\n".join(_edge_lines)
+                            _forecast_prompt = (
+                                "You are a strategic analyst for AGCO/Fendt. "
+                                "Below are verified causal relationships from our PESTEL Knowledge Graph. "
+                                "Using ONLY these existing edges — no invented sources, no fabricated URLs, "
+                                "no external data — identify the 3 most likely NEXT-LEVEL cross-PESTEL "
+                                "effects: where does one dimension's shift logically cascade into another?\n\n"
+                                "Format each prediction as:\n"
+                                "  [SOURCE_DIM] Event → [TARGET_DIM] Predicted effect "
+                                "(confidence: High/Medium/Low, reasoning: one sentence)\n\n"
+                                "No URLs. No fabricated company names or figures.\n\n"
+                                f"EXISTING GRAPH EDGES:\n{_graph_ctx}"
+                            )
+                            with st.spinner("Generating cross-PESTEL forecast..."):
+                                _forecast_text = _call_gemini(_forecast_model, _forecast_prompt, max_tokens=500)
+                            if _forecast_text:
+                                st.markdown(
+                                    f"<div style='background:rgba(150,78,163,0.08);"
+                                    f"border-left:3px solid #984ea3;border-radius:6px;"
+                                    f"padding:14px;white-space:pre-line;color:#e0e0e0;'>"
+                                    f"{_forecast_text}</div>",
+                                    unsafe_allow_html=True,
+                                )
+                                st.caption("⚠️ AI-generated from existing graph edges only. No external sources.")
+                            else:
+                                _api_unavailable_state("Cross-PESTEL Forecast")
+                    except Exception as _fe:
+                        st.error(f"Forecast generation failed: {str(_fe)[:200]}")
+
         except ImportError as e:
             st.error(f"⚠️ Required libraries not installed: {str(e)}")
             st.info("Run: `pip install pyvis networkx`")
@@ -1542,6 +1810,220 @@ with tab6:
                     st.caption("python-pptx not installed — PPTX unavailable")
                 except Exception as pptx_err:
                     st.caption(f"PPTX error: {pptx_err}")
+
+            # ── Additional export formats: XLS and DOC ──────────────────
+            dl_col4, dl_col5 = st.columns(2)
+
+            with dl_col4:
+                # Excel export — parse markdown into rows, one per line
+                try:
+                    import openpyxl
+                    import io as _io
+                    import re as _re
+
+                    def _md_to_xlsx_bytes(md_text: str, sheet_title: str) -> bytes:
+                        wb = openpyxl.Workbook()
+                        ws = wb.active
+                        ws.title = sheet_title[:31]  # Excel sheet name limit
+                        from openpyxl.styles import Font, PatternFill, Alignment
+                        HEADER_FILL = PatternFill("solid", fgColor="003366")
+                        HEADER_FONT = Font(color="FFFFFF", bold=True, size=12)
+                        H2_FONT = Font(color="004499", bold=True, size=11)
+                        H3_FONT = Font(color="0055AA", bold=True, size=10)
+
+                        row_num = 1
+                        for line in md_text.split('\n'):
+                            ls = line.strip()
+                            if not ls:
+                                row_num += 1
+                                continue
+                            clean = _re.sub(r'\*\*(.*?)\*\*', r'\1', ls)
+                            clean = _re.sub(r'\*(.*?)\*', r'\1', clean)
+                            clean = _re.sub(r'`(.*?)`', r'\1', clean)
+                            clean = _re.sub(r'^---+$', '─' * 40, clean)
+                            cell = ws.cell(row=row_num, column=1, value=clean.lstrip('#- *').strip())
+                            cell.alignment = Alignment(wrap_text=True)
+                            if ls.startswith('# '):
+                                cell.font = HEADER_FONT
+                                cell.fill = HEADER_FILL
+                            elif ls.startswith('## '):
+                                cell.font = H2_FONT
+                            elif ls.startswith('### '):
+                                cell.font = H3_FONT
+                            row_num += 1
+
+                        ws.column_dimensions['A'].width = 120
+                        buf = _io.BytesIO()
+                        wb.save(buf)
+                        return buf.getvalue()
+
+                    xlsx_bytes = _md_to_xlsx_bytes(report_content, selected_report.replace('.md', ''))
+                    st.download_button(
+                        label="📊 Excel (.xlsx)",
+                        data=xlsx_bytes,
+                        file_name=selected_report.replace('.md', '.xlsx'),
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
+                except ImportError:
+                    st.download_button(
+                        label="📊 Excel (CSV fallback — openpyxl not installed)",
+                        data=report_content,
+                        file_name=selected_report.replace('.md', '.csv'),
+                        mime="text/csv",
+                    )
+                except Exception as xlsx_err:
+                    st.caption(f"Excel error: {xlsx_err}")
+
+            with dl_col5:
+                # Word DOC export using python-docx
+                try:
+                    from docx import Document
+                    from docx.shared import Pt, RGBColor as DocxRGB
+                    import io as _io
+                    import re as _re
+
+                    def _md_to_docx_bytes(md_text: str, doc_title: str) -> bytes:
+                        doc = Document()
+                        doc.core_properties.title = doc_title
+                        doc.core_properties.author = "Fendt PESTEL-EL Sentinel"
+                        # Title
+                        doc.add_heading(doc_title.replace('.md', '').replace('_', ' ').title(), 0)
+                        doc.add_paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')} UTC")
+                        doc.add_paragraph()
+                        for line in md_text.split('\n'):
+                            ls = line.strip()
+                            if not ls:
+                                doc.add_paragraph()
+                                continue
+                            clean = _re.sub(r'\*\*(.*?)\*\*', r'\1', ls)
+                            clean = _re.sub(r'\*(.*?)\*', r'\1', clean)
+                            clean = _re.sub(r'`(.*?)`', r'\1', clean)
+                            if ls.startswith('# '):
+                                doc.add_heading(clean.lstrip('# '), level=1)
+                            elif ls.startswith('## '):
+                                doc.add_heading(clean.lstrip('# '), level=2)
+                            elif ls.startswith('### '):
+                                doc.add_heading(clean.lstrip('# '), level=3)
+                            elif ls.startswith('---'):
+                                doc.add_paragraph('─' * 50)
+                            elif ls.startswith('- ') or ls.startswith('* '):
+                                doc.add_paragraph(clean.lstrip('- '), style='List Bullet')
+                            else:
+                                doc.add_paragraph(clean)
+                        buf = _io.BytesIO()
+                        doc.save(buf)
+                        return buf.getvalue()
+
+                    docx_bytes = _md_to_docx_bytes(report_content, selected_report)
+                    st.download_button(
+                        label="📝 Word (.docx)",
+                        data=docx_bytes,
+                        file_name=selected_report.replace('.md', '.docx'),
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    )
+                except ImportError:
+                    st.download_button(
+                        label="📝 Word (TXT fallback — python-docx not installed)",
+                        data=report_content,
+                        file_name=selected_report.replace('.md', '.txt'),
+                        mime="text/plain",
+                    )
+                except Exception as docx_err:
+                    st.caption(f"Word error: {docx_err}")
+
+            # ── Role-Based AI Summary ─────────────────────────────────────
+            st.markdown("---")
+            st.markdown("### 🎯 Role-Based Summary")
+            st.caption(
+                "Select your department. The AI generates a tailored summary of findings, "
+                "recommended actions, and 12-month forecasts — grounded strictly in the "
+                "signals currently in the database. No external sources or invented facts."
+            )
+
+            _DEPT_LENSES = {
+                "📢 Marketing": (
+                    "competitive positioning, brand differentiation, customer messaging, pricing pressure, "
+                    "market share implications"
+                ),
+                "💼 Sales": (
+                    "product portfolio viability, key customer segment risks, revenue impact, "
+                    "competitor threat assessment, deal pipeline implications"
+                ),
+                "🔧 Product Management": (
+                    "R&D roadmap prioritization, technology readiness levels, feature gaps vs. competitors, "
+                    "patent landscape, build-vs-buy decisions"
+                ),
+                "🚚 Supply Chain": (
+                    "raw material cost volatility, supplier concentration risk, logistics disruption, "
+                    "electrification supply chain gaps, component availability for new platforms"
+                ),
+            }
+
+            _dept_choice = st.selectbox(
+                "Select department",
+                options=list(_DEPT_LENSES.keys()),
+                key="dept_summary_select",
+            )
+
+            if st.button("📋 Generate Department Summary", key="dept_summary_btn"):
+                _dept_model = _get_gemini_model()
+                if not _dept_model:
+                    _api_unavailable_state("Department Summary")
+                else:
+                    # Build signal context from DB (avoid hallucination)
+                    _all_sigs = load_all_signals()
+                    if _all_sigs:
+                        _sig_lines = []
+                        for _s in sorted(
+                            _all_sigs,
+                            key=lambda x: x.get('impact_score') or 0,
+                            reverse=True,
+                        )[:15]:
+                            _sig_lines.append(
+                                f"  [{_s.get('primary_dimension','?')}] "
+                                f"{_s['title']} — "
+                                f"Impact {_s.get('impact_score',0):.2f}, "
+                                f"Severity {_s.get('disruption_classification','?')}"
+                            )
+                        _sig_ctx = "\n".join(_sig_lines)
+                    else:
+                        _sig_ctx = "(no signals in database)"
+
+                    _dept_prompt = (
+                        f"You are a strategic advisor briefing the {_dept_choice.split(' ', 1)[1]} "
+                        f"team at AGCO/Fendt. "
+                        f"Using ONLY the disruption signals listed below — no invented data, "
+                        f"no fabricated URLs, no external sources — produce a structured brief with:\n"
+                        f"1. KEY FINDINGS relevant to {_dept_choice.split(' ', 1)[1]} "
+                        f"(focus on: {_DEPT_LENSES[_dept_choice]})\n"
+                        f"2. RECOMMENDED ACTIONS (3 concrete steps this team should take now)\n"
+                        f"3. 12-MONTH FORECAST for this department based strictly on the data\n\n"
+                        f"Rules: No URLs. No company names not present in the data. "
+                        f"Max 400 words total.\n\n"
+                        f"SIGNALS:\n{_sig_ctx}"
+                    )
+
+                    with st.spinner(f"Generating {_dept_choice} summary..."):
+                        _dept_text = _call_gemini(_dept_model, _dept_prompt, max_tokens=500)
+
+                    if _dept_text:
+                        st.markdown(
+                            f"<div style='background:rgba(0,204,255,0.07);border-left:3px solid #00ccff;"
+                            f"border-radius:6px;padding:16px;white-space:pre-line;color:#e0e0e0;'>"
+                            f"<b style='color:#00ccff;'>{_dept_choice} Brief</b><br><br>"
+                            f"{_dept_text}</div>",
+                            unsafe_allow_html=True,
+                        )
+                        st.caption("⚠️ AI-generated from database signals only. Always verify before distribution.")
+                        # Offer download of this summary
+                        st.download_button(
+                            label="💾 Download Summary (.txt)",
+                            data=f"{_dept_choice} Brief\n{'='*60}\n\n{_dept_text}",
+                            file_name=f"dept_summary_{_dept_choice.split()[1].lower()}_{datetime.now().strftime('%Y%m%d')}.txt",
+                            mime="text/plain",
+                        )
+                    else:
+                        _api_unavailable_state("Department Summary")
 
         except Exception as e:
             st.error(f"Error reading report: {str(e)}")

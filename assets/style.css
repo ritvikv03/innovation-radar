@@ -1,0 +1,647 @@
+/* ================================================================
+   Fendt PESTEL-EL Sentinel — Strategic War Room Design System
+   v4.0 · Premium Dark · Glassmorphism · Inter + JetBrains Mono
+   ================================================================ */
+
+/* ── 1. Design Tokens ──────────────────────────────────────────── */
+:root {
+  /* Layer stack — depth-based */
+  --void:    #06080d;
+  --base:    #0d1117;
+  --surface: #131922;
+  --raise:   #1a2234;
+
+  /* Glassmorphism cards */
+  --card:        rgba(255, 255, 255, 0.032);
+  --card-hover:  rgba(255, 255, 255, 0.055);
+  --card-border: rgba(255, 255, 255, 0.07);
+  --card-hi:     rgba(255, 255, 255, 0.13);
+  --input-bg:    rgba(255, 255, 255, 0.04);
+
+  /* Accent palette */
+  --cyan:   #00e5ff;    --cyan-g:   rgba(0, 229, 255, 0.15);
+  --green:  #00e676;    --green-g:  rgba(0, 230, 118, 0.15);
+  --amber:  #ffab00;    --amber-g:  rgba(255, 171, 0, 0.15);
+  --red:    #ff1744;    --red-g:    rgba(255, 23, 68, 0.15);
+  --purple: #b388ff;
+
+  /* Text scale */
+  --hi:  #e8edf5;
+  --mid: #7d8fa8;
+  --lo:  #3d4f62;
+
+  /* Fonts */
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+
+  /* Geometry */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+
+  --sidebar-w: 224px;
+}
+
+/* ── 2. Global Reset ───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--base);
+  color: var(--hi);
+  font-family: var(--font);
+  font-size: 13.5px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar             { width: 4px; height: 4px; }
+::-webkit-scrollbar-track       { background: transparent; }
+::-webkit-scrollbar-thumb       { background: rgba(255,255,255,0.08); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+/* ── 3. Application Shell ──────────────────────────────────────── */
+.war-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--base);
+  color: var(--hi);
+}
+
+/* ── 4. Sidebar ────────────────────────────────────────────────── */
+.war-sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.sb-brand {
+  padding: 24px 20px 18px;
+  border-bottom: 1px solid var(--card-border);
+}
+.sb-brand-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hi);
+}
+.sb-brand-sub {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  opacity: 0.6;
+  margin-top: 3px;
+}
+
+.sb-section {
+  padding: 16px 20px 4px;
+}
+.sb-section-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--lo);
+  margin-bottom: 10px;
+}
+
+.sb-kpi        { padding: 6px 0; }
+.sb-kpi-label  { font-size: 9.5px; color: var(--lo); text-transform: uppercase; letter-spacing: 0.08em; }
+.sb-kpi-value  {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--hi);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.sb-divider { height: 1px; background: var(--card-border); margin: 10px 0; }
+
+.sb-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 11px;
+  color: var(--mid);
+}
+.sb-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dot-live  { background: var(--green); box-shadow: 0 0 5px var(--green); animation: pulse-dot 2.5s ease-in-out infinite; }
+.dot-warn  { background: var(--amber); box-shadow: 0 0 5px var(--amber); }
+.dot-error { background: var(--red);   box-shadow: 0 0 5px var(--red); }
+.dot-idle  { background: var(--lo); }
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+.sb-cov-row   { display: flex; align-items: center; justify-content: space-between; padding: 3px 0; }
+.sb-cov-dim   { font-size: 10px; font-weight: 600; }
+.sb-cov-count { font-family: var(--mono); font-size: 11px; color: var(--hi); }
+
+.sb-action { padding: 14px 20px; }
+.sb-run-status {
+  font-size: 10px;
+  color: var(--lo);
+  margin-top: 6px;
+  min-height: 14px;
+  text-align: center;
+}
+
+.sb-footer {
+  margin-top: auto;
+  padding: 14px 20px;
+  border-top: 1px solid var(--card-border);
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--lo);
+  line-height: 2;
+}
+
+/* Scout button — fully custom, replaces DBC defaults */
+.btn-scout {
+  width: 100% !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+  padding: 8px 14px !important;
+  border-radius: var(--r-sm) !important;
+  border: 1px solid rgba(0, 230, 118, 0.35) !important;
+  color: var(--green) !important;
+  background: rgba(0, 230, 118, 0.06) !important;
+  transition: all 0.2s ease !important;
+}
+.btn-scout:hover, .btn-scout:focus {
+  background: rgba(0, 230, 118, 0.15) !important;
+  border-color: rgba(0, 230, 118, 0.7) !important;
+  box-shadow: 0 0 20px rgba(0, 230, 118, 0.12) !important;
+  color: var(--green) !important;
+}
+
+/* ── 5. Main Area ──────────────────────────────────────────────── */
+.war-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--base);
+}
+
+/* ── 6. Top Bar ────────────────────────────────────────────────── */
+.war-topbar {
+  height: 52px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 28px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--card-border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.topbar-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--hi);
+  flex: 1;
+}
+.topbar-ts {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--lo);
+}
+.topbar-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 99px;
+  border: 1px solid;
+}
+
+/* Refresh button */
+.btn-refresh {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  padding: 4px 12px !important;
+  border-radius: var(--r-sm) !important;
+  border: 1px solid var(--card-hi) !important;
+  color: var(--mid) !important;
+  background: transparent !important;
+  transition: all 0.15s ease !important;
+}
+.btn-refresh:hover, .btn-refresh:focus {
+  color: var(--hi) !important;
+  border-color: var(--cyan) !important;
+  background: rgba(0,229,255,0.05) !important;
+}
+
+/* ── 7. Tab Navigation ─────────────────────────────────────────── */
+.war-tabnav {
+  padding: 0 28px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.war-tabs .nav-item { margin-right: 4px; }
+.war-tabs .nav-link {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: var(--mid) !important;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  padding: 14px 18px !important;
+  letter-spacing: 0.03em !important;
+  transition: color 0.15s, border-color 0.15s !important;
+  white-space: nowrap;
+}
+.war-tabs .nav-link:hover  { color: var(--hi) !important; }
+.war-tabs .nav-link.active {
+  color: var(--cyan) !important;
+  border-bottom-color: var(--cyan) !important;
+  background: transparent !important;
+}
+
+/* ── 8. Page Canvas ────────────────────────────────────────────── */
+.war-canvas {
+  flex: 1;
+  padding: 28px;
+  overflow-y: auto;
+}
+
+/* ── 9. Card Components (Glassmorphism) ────────────────────────── */
+
+/* Generic content card */
+.war-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  height: 100%;
+  transition: border-color 0.2s ease;
+}
+.war-card:hover { border-color: var(--card-hi); }
+
+/* Chart wrapper — zero padding, overflow hidden for rounded corners */
+.chart-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  height: 100%;
+  transition: border-color 0.2s ease;
+}
+.chart-card:hover { border-color: var(--card-hi); }
+
+/* KPI metric tile */
+.kpi-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--r-md);
+  padding: 22px 24px;
+  height: 100%;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.kpi-card:hover { border-color: var(--card-hi); }
+
+/* Glow accent borders */
+.glow-cyan   { border-color: rgba(0,229,255,0.2) !important;   box-shadow: inset 0 1px 0 rgba(0,229,255,0.06); }
+.glow-green  { border-color: rgba(0,230,118,0.2) !important;   box-shadow: inset 0 1px 0 rgba(0,230,118,0.06); }
+.glow-amber  { border-color: rgba(255,171,0,0.2) !important;   box-shadow: inset 0 1px 0 rgba(255,171,0,0.06); }
+.glow-red    { border-color: rgba(255,23,68,0.2) !important;   box-shadow: inset 0 1px 0 rgba(255,23,68,0.06); }
+.glow-purple { border-color: rgba(179,136,255,0.2) !important; box-shadow: inset 0 1px 0 rgba(179,136,255,0.06); }
+
+/* ── 10. Typography Hierarchy ──────────────────────────────────── */
+.section-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lo);
+  margin-bottom: 18px;
+}
+.card-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--hi);
+  margin-bottom: 16px;
+  letter-spacing: 0.02em;
+}
+.kpi-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lo);
+  margin-bottom: 8px;
+}
+.kpi-value {
+  font-family: var(--mono);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--hi);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+.kpi-sub {
+  font-size: 10.5px;
+  color: var(--mid);
+  margin-top: 7px;
+}
+
+/* ── 11. AI Insight Block ──────────────────────────────────────── */
+.ai-insight {
+  border-left: 3px solid var(--cyan);
+  padding: 14px 18px;
+  background: rgba(0, 229, 255, 0.04);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  margin-bottom: 10px;
+}
+.ai-insight-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--hi);
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+.ai-insight-body { font-size: 11.5px; color: var(--mid); line-height: 1.65; }
+
+/* ── 12. Signal Feed Rows ──────────────────────────────────────── */
+.feed-row {
+  padding: 12px 16px;
+  border-radius: var(--r-sm);
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-left-width: 3px;
+  border-left-style: solid;
+  margin-bottom: 8px;
+  transition: background 0.15s, border-color 0.15s;
+  cursor: default;
+}
+.feed-row:hover { background: var(--card-hover); }
+
+.feed-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+.feed-title  { font-size: 12.5px; font-weight: 600; color: var(--hi); line-height: 1.4; margin-bottom: 4px; }
+.feed-meta   { font-size: 10px; color: var(--lo); }
+.feed-score  { font-family: var(--mono); font-size: 10px; color: var(--amber); }
+
+/* ── 13. PESTEL Dimension Pills ────────────────────────────────── */
+.dim-pill {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+.dp-P  { color: #64b5f6; border-color: rgba(100,181,246,0.4); background: rgba(100,181,246,0.1); }
+.dp-E  { color: #a5d6a7; border-color: rgba(165,214,167,0.4); background: rgba(165,214,167,0.1); }
+.dp-S  { color: #ffcc80; border-color: rgba(255,204,128,0.4); background: rgba(255,204,128,0.1); }
+.dp-T  { color: #ce93d8; border-color: rgba(206,147,216,0.4); background: rgba(206,147,216,0.1); }
+.dp-En { color: #80deea; border-color: rgba(128,222,234,0.4); background: rgba(128,222,234,0.1); }
+.dp-L  { color: #ef9a9a; border-color: rgba(239,154,154,0.4); background: rgba(239,154,154,0.1); }
+
+/* ── 14. Severity Badges ───────────────────────────────────────── */
+.sev-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.sev-critical { background: rgba(255,23,68,0.18);  color: #ff6090; }
+.sev-high     { background: rgba(255,171,0,0.18);  color: #ffd740; }
+.sev-moderate { background: rgba(0,229,255,0.12);  color: var(--cyan); }
+.sev-low      { background: rgba(255,255,255,0.05); color: var(--mid); }
+
+/* ── 15. Chat Interface ────────────────────────────────────────── */
+.chat-history {
+  display: flex;
+  flex-direction: column;
+  height: 450px;
+  overflow-y: auto;
+  padding: 16px;
+  gap: 10px;
+  background: rgba(0,0,0,0.28);
+  border: 1px solid var(--card-border);
+  border-radius: var(--r-md);
+  margin-bottom: 12px;
+}
+.bubble {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  font-size: 12.5px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+.bubble-user {
+  align-self: flex-end;
+  background: rgba(0, 229, 255, 0.09);
+  border: 1px solid rgba(0, 229, 255, 0.22);
+  color: var(--hi);
+}
+.bubble-assistant {
+  align-self: flex-start;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--card-border);
+  color: var(--hi);
+}
+.chat-controls { display: flex; gap: 8px; align-items: center; }
+.chat-input-field {
+  flex: 1;
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--r-sm);
+  color: var(--hi);
+  font-size: 12.5px;
+  padding: 9px 14px;
+  outline: none;
+  font-family: var(--font);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.chat-input-field:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px rgba(0,229,255,0.08);
+}
+.chat-input-field::placeholder { color: var(--lo); }
+
+/* Chat send button */
+.btn-send {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  padding: 9px 18px !important;
+  border-radius: var(--r-sm) !important;
+  border: 1px solid rgba(0,229,255,0.4) !important;
+  background: rgba(0,229,255,0.08) !important;
+  color: var(--cyan) !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap;
+}
+.btn-send:hover, .btn-send:focus {
+  background: rgba(0,229,255,0.16) !important;
+  border-color: var(--cyan) !important;
+  color: var(--cyan) !important;
+  box-shadow: 0 0 14px rgba(0,229,255,0.1) !important;
+}
+
+/* ── 16. Suggestion Chips ──────────────────────────────────────── */
+.chip {
+  display: block;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--r-sm);
+  font-size: 11px;
+  color: var(--mid);
+  cursor: pointer;
+  margin-bottom: 7px;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  line-height: 1.45;
+}
+.chip:hover {
+  border-color: rgba(0,229,255,0.4);
+  color: var(--hi);
+  background: rgba(0, 229, 255, 0.05);
+}
+
+/* ── 17. Source Link ───────────────────────────────────────────── */
+.source-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--cyan);
+  text-decoration: none;
+  opacity: 0.65;
+  transition: opacity 0.15s;
+  font-family: var(--mono);
+}
+.source-link:hover { opacity: 1; text-decoration: underline; color: var(--cyan); }
+
+/* Urgency matrix signal card (CRITICAL 12M) */
+.urgency-card {
+  background: rgba(255, 23, 68, 0.05);
+  border: 1px solid rgba(255, 23, 68, 0.2);
+  border-left: 3px solid var(--red);
+  border-radius: var(--r-md);
+  padding: 18px 20px;
+  height: 100%;
+  transition: border-color 0.2s, background 0.2s;
+}
+.urgency-card:hover {
+  background: rgba(255, 23, 68, 0.09);
+  border-color: rgba(255, 23, 68, 0.4);
+}
+.urgency-score {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--red);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  margin: 8px 0 6px;
+}
+.urgency-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hi);
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
+/* ── 18. Radar Filters Panel ───────────────────────────────────── */
+.filter-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lo);
+  margin-bottom: 6px;
+  margin-top: 14px;
+}
+.filter-label:first-child { margin-top: 0; }
+
+/* ── 18. DBC / Bootstrap Overrides ────────────────────────────── */
+.row { --bs-gutter-x: 20px; --bs-gutter-y: 20px; }
+
+/* Remove Bootstrap card styling interference */
+.card { background: transparent !important; border: none !important; }
+
+/* ── 19. Plotly Cleanup ────────────────────────────────────────── */
+.js-plotly-plot .plotly, .plot-container { background: transparent !important; }
+.modebar-container { display: none !important; }
+
+/* ── 20. DCC Dropdown Dark Overrides ───────────────────────────── */
+.Select-control {
+  background: var(--input-bg) !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: var(--r-sm) !important;
+  min-height: 34px !important;
+}
+.Select-control:hover { border-color: var(--card-hi) !important; }
+.is-focused .Select-control, .Select--is-focused .Select-control {
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 0 2px rgba(0,229,255,0.1) !important;
+}
+.Select-menu-outer {
+  background: var(--raise) !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: var(--r-sm) !important;
+  z-index: 1000;
+  margin-top: 2px !important;
+}
+.Select-option {
+  color: var(--mid) !important;
+  background: transparent !important;
+  font-size: 12px !important;
+  padding: 8px 12px !important;
+}
+.Select-option:hover,
+.Select-option.is-focused  { color: var(--hi) !important; background: rgba(255,255,255,0.05) !important; }
+.Select-option.is-selected { color: var(--cyan) !important; background: rgba(0,229,255,0.08) !important; }
+.Select-value-label   { color: var(--hi) !important; font-size: 12px !important; }
+.Select-placeholder   { color: var(--lo) !important; font-size: 12px !important; }
+.Select-arrow-zone    { padding-right: 10px !important; }
+.Select-arrow         { border-top-color: var(--mid) !important; }
+
+/* DCC Slider */
+.rc-slider-rail   { background: rgba(255,255,255,0.08) !important; }
+.rc-slider-track  { background: var(--cyan) !important; }
+.rc-slider-handle {
+  border-color: var(--cyan) !important;
+  background: var(--base) !important;
+  box-shadow: 0 0 0 2px rgba(0,229,255,0.2) !important;
+}
+.rc-slider-dot-active { border-color: var(--cyan) !important; }
+.rc-slider-mark-text  { color: var(--lo) !important; font-size: 10px !important; }
+
+/* ── 21. Responsive ────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  :root { --sidebar-w: 200px; }
+  .kpi-value  { font-size: 28px; }
+  .war-canvas { padding: 20px; }
+}
+@media (max-width: 768px) {
+  .war-sidebar { display: none; }
+  .war-canvas  { padding: 16px; }
+}

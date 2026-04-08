@@ -34,9 +34,18 @@ jobs:
           FIRE_CRAWL_API_KEY: ${{ secrets.FIRE_CRAWL_API_KEY }}
 
       - name: Commit and Push Updates
+        env:
+          RUN_DATE: ${{ github.run_id }}
         run: |
           git config --global user.name "Sentinel Bot"
           git config --global user.email "bot@fendt-innovation.ai"
-          git add data/graph.json data/sentinel_state.json logs/sentinel.log raw_ingest/ output/
-          git commit -m "Autonomous Update: $(date +'%Y-%m-%d %H:%M')" || echo "No changes to commit"
+          # Stage pipeline artifacts — outputs/ (plural) is the canonical write path.
+          # q2_solution/data/signals.db tracks the SQLite temporal store.
+          git add \
+            outputs/ \
+            q2_solution/data/signals.db \
+            logs/sentinel.log \
+            data/graph.json \
+            data/sentinel_state.json || true
+          git commit -m "Autonomous Update: run-${RUN_DATE}" || echo "No changes to commit"
           git push
