@@ -33,8 +33,11 @@ import logging
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 logging.getLogger("dash").setLevel(logging.ERROR)
 
+import json
+
 import dash
 import dash_bootstrap_components as dbc
+import dash_cytoscape as cyto
 import numpy as np
 import plotly.graph_objects as go
 from dash import Input, Output, State, callback_context, dcc, html, no_update
@@ -761,6 +764,272 @@ def _tab_chatbot(history: list[dict] | None = None) -> html.Div:
 
 
 # ─────────────────────────────────────────────────────────────
+# Tab builders — Phase 2 tabs
+# ─────────────────────────────────────────────────────────────
+
+_GRAPH_JSON = Path(__file__).parent / "data" / "graph.json"
+
+# Colour map: PESTEL category → node colour
+_CAT_COLOUR: dict[str, str] = {
+    "POLITICAL":     "#ff6b6b",
+    "ECONOMIC":      "#ffd93d",
+    "SOCIAL":        "#6bcb77",
+    "TECHNOLOGICAL": "#00e5ff",
+    "ENVIRONMENTAL": "#a29bfe",
+    "LEGAL":         "#fd79a8",
+}
+
+_CYTO_STYLESHEET = [
+    {
+        "selector": "node",
+        "style": {
+            "label":            "data(label)",
+            "background-color": "data(colour)",
+            "color":            "#e2e8f0",
+            "font-size":        "10px",
+            "font-family":      "JetBrains Mono, monospace",
+            "text-wrap":        "wrap",
+            "text-max-width":   "120px",
+            "width":            "28px",
+            "height":           "28px",
+            "border-width":     "2px",
+            "border-color":     "rgba(255,255,255,0.15)",
+        },
+    },
+    {
+        "selector": "edge",
+        "style": {
+            "line-color":          "#9cb3c9",
+            "target-arrow-color":  "#9cb3c9",
+            "target-arrow-shape":  "triangle",
+            "curve-style":         "bezier",
+            "opacity":             "0.6",
+            "width":               "data(weight_px)",
+            "label":               "data(relationship)",
+            "font-size":           "9px",
+            "color":               "#9cb3c9",
+            "text-opacity":        "0.7",
+        },
+    },
+    {
+        "selector": "node:selected",
+        "style": {
+            "border-color": "#00e5ff",
+            "border-width": "3px",
+        },
+    },
+]
+
+
+def _load_graph_elements() -> list[dict]:
+    """Load data/graph.json and convert to cytoscape elements format."""
+    if not _GRAPH_JSON.exists():
+        return []
+    raw = json.loads(_GRAPH_JSON.read_text())
+    elements: list[dict] = []
+    for node in raw.get("nodes", []):
+        cat = node.get("category", "")
+        elements.append({
+            "data": {
+                "id":     node["id"],
+                "label":  node.get("label", node["id"])[:40],
+                "colour": _CAT_COLOUR.get(cat, "#9cb3c9"),
+                "category": cat,
+            },
+        })
+    for link in raw.get("links", []):
+        weight = link.get("weight", 0.5)
+        elements.append({
+            "data": {
+                "source":       link["source"],
+                "target":       link["target"],
+                "relationship": link.get("relationship", ""),
+                "weight_px":    max(1, int(weight * 6)),
+            },
+        })
+    return elements
+
+
+def _tab_graph() -> html.Div:
+    """Knowledge Graph — causal interdependency visualisation."""
+    elements = _load_graph_elements()
+    node_count = sum(1 for e in elements if "source" not in e.get("data", {}))
+    edge_count  = len(elements) - node_count
+
+    legend = [
+        html.Div([
+            html.Div(style={
+                "width": "10px", "height": "10px", "borderRadius": "50%",
+                "background": col, "flexShrink": "0",
+                "boxShadow": f"0 0 5px {col}",
+            }),
+            html.Span(cat, style={"fontSize": "10px", "color": "#e2e8f0"}),
+        ], style={"display": "flex", "alignItems": "center", "gap": "8px", "marginBottom": "6px"})
+        for cat, col in _CAT_COLOUR.items()
+    ]
+
+    return html.Div([
+        dbc.Row([
+            dbc.Col(html.Div(
+                cyto.Cytoscape(
+                    id="knowledge-graph",
+                    elements=elements,
+                    layout={"name": "cose", "animate": False},
+                    stylesheet=_CYTO_STYLESHEET,
+                    style={"width": "100%", "height": "560px",
+                           "background": "rgba(13,17,23,0.95)",
+                           "borderRadius": "8px"},
+                ),
+                className="chart-card",
+            ), md=9),
+            dbc.Col(html.Div([
+                html.Div("GRAPH INFO", className="section-label"),
+                _metric("Nodes", str(node_count)),
+                html.Div(style={"height": "8px"}),
+                _metric("Edges", str(edge_count)),
+                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
+                html.Div("DIMENSION KEY", className="section-label"),
+                *legend,
+                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
+                html.Div("LAYOUT", className="section-label"),
+                html.Div("CoSE (force-directed)",
+                         style={"fontFamily": "JetBrains Mono, monospace",
+                                "fontSize": "10px", "color": "#e2e8f0"}),
+                html.Div("Click a node to inspect · Drag to explore",
+                         style={"fontSize": "9px", "color": "#9cb3c9", "marginTop": "6px"}),
+            ], className="war-card"), md=3),
+        ], className="g-3"),
+    ])
+
+
+# ── Reports helpers ───────────────────────────────────────────
+
+_REPORTS_DIR = Path(__file__).parent / "outputs" / "reports"
+
+
+def _glob_reports() -> list[dict]:
+    """Return sorted list of {label, value} dicts for available .md reports."""
+    paths = sorted(_REPORTS_DIR.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return [{"label": p.stem.replace("_", " ").title(), "value": str(p)} for p in paths]
+
+
+def _tab_reports() -> html.Div:
+    """Strategic Reports — Markdown viewer for AI-generated C-Suite briefs."""
+    options = _glob_reports()
+    default = options[0]["value"] if options else None
+    return html.Div([
+        dbc.Row([
+            dbc.Col([
+                html.Div("SELECT REPORT", className="section-label"),
+                dcc.Dropdown(
+                    id="reports-dropdown",
+                    options=options,
+                    value=default,
+                    clearable=False,
+                    placeholder="No reports found in outputs/reports/",
+                    style={"marginBottom": "20px"},
+                ),
+                html.Div(id="reports-body", className="war-card"),
+            ], md=10),
+            dbc.Col(html.Div([
+                html.Div("REPORTS", className="section-label"),
+                _metric("Available", str(len(options))),
+                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
+                html.Div("Generated by Fendt Sentinel pipeline. Place .md files in outputs/reports/ to register them here.",
+                         style={"fontSize": "9px", "color": "#9cb3c9", "lineHeight": "1.6"}),
+            ], className="war-card"), md=2),
+        ], className="g-3"),
+    ])
+
+
+# ── Intelligence Lens helpers ─────────────────────────────────
+
+_LENS_PRESETS = [
+    "CAP Reform",
+    "Electric Tractor Adoption",
+    "Precision Farming Regulation",
+    "Grain Price Volatility",
+    "EU Green Deal Agriculture",
+    "Right to Repair Policy",
+    "Labour Shortages in Farming",
+    "Custom Search…",
+]
+
+
+def _lens_signal_card(sig: "Signal", score: float) -> html.Div:  # type: ignore[name-defined]
+    """Render a single signal result card for the Intelligence Lens."""
+    relevance_pct = f"{score * 100:.0f}%"
+    dim_col = _DIM_COLOUR.get(sig.pestel_dimension.value, "#9cb3c9")
+    return html.Div([
+        html.Div([
+            html.Span(sig.pestel_dimension.value[:3],
+                      style={"color": dim_col, "fontWeight": "700",
+                             "fontSize": "10px", "minWidth": "32px"}),
+            html.Span(sig.title,
+                      style={"color": "#e2e8f0", "fontSize": "12px", "fontWeight": "600",
+                             "flex": "1", "lineHeight": "1.4"}),
+            html.Span(f"relevance {relevance_pct}",
+                      style={"color": "#9cb3c9", "fontSize": "9px",
+                             "fontFamily": "JetBrains Mono, monospace",
+                             "whiteSpace": "nowrap"}),
+        ], style={"display": "flex", "gap": "10px", "alignItems": "flex-start",
+                  "marginBottom": "6px"}),
+        html.P(sig.content[:200] + ("…" if len(sig.content) > 200 else ""),
+               style={"fontSize": "11px", "color": "#9cb3c9", "margin": "0 0 6px 42px",
+                      "lineHeight": "1.6"}),
+        html.A(
+            "source →", href=sig.source_url, target="_blank",
+            style={"fontSize": "10px", "color": "#00e5ff", "marginLeft": "42px"},
+        ),
+    ], className="war-card", style={"marginBottom": "10px"})
+
+
+def _tab_lens() -> html.Div:
+    """Strategic Intelligence Lens — semantic deep-dive via ChromaDB search."""
+    return html.Div([
+        dbc.Row([
+            dbc.Col([
+                html.Div("MACRO-TREND TOPIC", className="section-label"),
+                dcc.Dropdown(
+                    id="lens-topic-dropdown",
+                    options=[{"label": t, "value": t} for t in _LENS_PRESETS],
+                    value=_LENS_PRESETS[0],
+                    clearable=False,
+                    style={"marginBottom": "10px"},
+                ),
+                dcc.Input(
+                    id="lens-custom-input",
+                    type="text",
+                    placeholder="Type a custom query (active when 'Custom Search…' selected)…",
+                    debounce=True,
+                    n_submit=0,
+                    className="chat-input-field",
+                    style={"marginBottom": "16px", "width": "100%"},
+                ),
+                dcc.Loading(
+                    html.Div(id="lens-results"),
+                    type="circle", color="#00e5ff",
+                ),
+            ], md=9),
+            dbc.Col(html.Div([
+                html.Div("HOW IT WORKS", className="section-label"),
+                html.P(
+                    "The Intelligence Lens uses ChromaDB semantic search to surface the most "
+                    "relevant signals for any macro-trend query. Results are ranked by cosine "
+                    "similarity against the all-MiniLM-L6-v2 embedding model.",
+                    style={"fontSize": "10px", "color": "#9cb3c9", "lineHeight": "1.6"},
+                ),
+                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
+                html.Div("TOP-K", className="section-label"),
+                html.Div("5 signals per query",
+                         style={"fontFamily": "JetBrains Mono, monospace",
+                                "fontSize": "10px", "color": "#e2e8f0"}),
+            ], className="war-card"), md=3),
+        ], className="g-3"),
+    ])
+
+
+# ─────────────────────────────────────────────────────────────
 # HuggingFace Strategic Chat Helper (sponsor requirement #3)
 # ─────────────────────────────────────────────────────────────
 
@@ -850,6 +1119,9 @@ _TABS = [
     ("radar",    "Disruption Horizon"),
     ("feed",     "Signal Feed"),
     ("chatbot",  "Strategic Advisor"),
+    ("graph",    "Knowledge Graph"),
+    ("reports",  "Strategic Reports"),
+    ("lens",     "Intelligence Lens"),
 ]
 
 # ── Sidebar ────────────────────────────────────────────────────
@@ -930,6 +1202,9 @@ def render_tab(tab: str, _i: int, _n: int, history: list) -> html.Div:
         "overview": _tab_overview,
         "radar":    _tab_radar,
         "feed":     _tab_feed,
+        "graph":    _tab_graph,
+        "reports":  _tab_reports,
+        "lens":     _tab_lens,
     }
     try:
         return dispatch.get(tab, _tab_overview)()
@@ -1103,6 +1378,69 @@ def export_report(n_clicks: int):
     html_content = _build_export_html()
     filename = f"fendt-pestel-report-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}.html"
     return dcc.send_string(html_content, filename)
+
+
+# ── Strategic Reports callback ────────────────────────────────
+
+@app.callback(
+    Output("reports-body", "children"),
+    Input("reports-dropdown", "value"),
+    prevent_initial_call=False,
+)
+def render_report(path: str | None) -> html.Div:
+    if not path:
+        return html.P(
+            "No reports available. Generate a report via the pipeline, then place the .md file in outputs/reports/.",
+            style={"color": "#9cb3c9", "fontSize": "12px", "padding": "16px"},
+        )
+    try:
+        content = Path(path).read_text(encoding="utf-8")
+        return dcc.Markdown(content, dangerously_allow_html=True, className="report-markdown")
+    except OSError as exc:
+        log.error("render_report: could not read %s: %s", path, exc)
+        return html.P(
+            f"Could not read report: {exc}",
+            style={"color": "#ff6090", "fontSize": "12px", "padding": "16px"},
+        )
+
+
+# ── Intelligence Lens callback ────────────────────────────────
+
+@app.callback(
+    Output("lens-results", "children"),
+    Input("lens-topic-dropdown", "value"),
+    Input("lens-custom-input",   "value"),
+    Input("lens-custom-input",   "n_submit"),
+    prevent_initial_call=False,
+)
+def lens_search(topic: str | None, custom: str | None, _ns: int) -> html.Div:
+    triggered = callback_context.triggered_id
+    query = (custom or "").strip() if (topic == "Custom Search…" or triggered == "lens-custom-input") else (topic or "")
+    if not query:
+        return html.P(
+            "Select a macro-trend or type a custom query above.",
+            style={"color": "#9cb3c9", "fontSize": "12px", "padding": "8px"},
+        )
+    try:
+        results = _get_db().search(query, n_results=5)
+    except Exception as exc:
+        log.error("lens_search crashed: %s", exc)
+        return html.P(
+            f"Search error: {exc}",
+            style={"color": "#ff6090", "fontSize": "12px"},
+        )
+    if not results:
+        return html.P(
+            f'No signals found for "{query}". Ingest more data via the Scout.',
+            style={"color": "#9cb3c9", "fontSize": "12px", "padding": "8px"},
+        )
+    header = html.Div(
+        f"{len(results)} signal(s) matched · query: \"{query}\"",
+        style={"fontSize": "10px", "color": "#9cb3c9",
+               "fontFamily": "JetBrains Mono, monospace", "marginBottom": "14px"},
+    )
+    cards = [_lens_signal_card(sig, score) for sig, score in results]
+    return html.Div([header, *cards])
 
 
 # ─────────────────────────────────────────────────────────────
