@@ -38,6 +38,14 @@ import json
 import dash
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
+
+# ── Optional PDF/Markdown rendering ───────────────────────────
+try:
+    import markdown as _md_lib
+    import fpdf as _fpdf_lib
+    _PDF_OK = True
+except ImportError:
+    _PDF_OK = False
 import numpy as np
 import plotly.graph_objects as go
 from dash import Input, Output, State, callback_context, dcc, html, no_update
@@ -852,18 +860,44 @@ def _load_graph_elements() -> list[dict]:
 
 def _tab_graph() -> html.Div:
     """Knowledge Graph — causal interdependency visualisation."""
-    elements = _load_graph_elements()
+    elements   = _load_graph_elements()
     node_count = sum(1 for e in elements if "source" not in e.get("data", {}))
-    edge_count  = len(elements) - node_count
+    edge_count = len(elements) - node_count
+
+    if node_count == 0:
+        empty = html.Div([
+            html.Div("○", className="empty-state-icon"),
+            html.Div("No graph data yet", className="empty-state-title"),
+            html.Div(
+                "Run the Scout to ingest signals. The Knowledge Graph populates automatically "
+                "as relationships are detected between PESTEL signals. Check back after the "
+                "next scout cycle.",
+                className="empty-state-body",
+            ),
+        ], className="empty-state")
+        return html.Div([
+            dbc.Row([
+                dbc.Col(html.Div(empty, className="chart-card",
+                                 style={"minHeight": "400px", "display": "flex",
+                                        "alignItems": "center", "justifyContent": "center"}),
+                        md=9),
+                dbc.Col(html.Div([
+                    html.Div("GRAPH INFO", className="section-label"),
+                    _metric("Nodes", "—"), html.Div(style={"height": "8px"}),
+                    _metric("Edges", "—"),
+                    html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
+                    html.Div("Run the Scout to generate graph data.",
+                             style={"fontSize": "10px", "color": "#3d4f62", "lineHeight": "1.6"}),
+                ], className="war-card"), md=3),
+            ], className="g-3"),
+        ])
 
     legend = [
         html.Div([
-            html.Div(style={
-                "width": "10px", "height": "10px", "borderRadius": "50%",
-                "background": col, "flexShrink": "0",
-                "boxShadow": f"0 0 5px {col}",
-            }),
-            html.Span(cat, style={"fontSize": "10px", "color": "#e2e8f0"}),
+            html.Div(style={"width": "10px", "height": "10px", "borderRadius": "50%",
+                            "background": col, "flexShrink": "0",
+                            "boxShadow": f"0 0 5px {col}"}),
+            html.Span(cat, style={"fontSize": "10px", "color": "#e8edf5"}),
         ], style={"display": "flex", "alignItems": "center", "gap": "8px", "marginBottom": "6px"})
         for cat, col in _CAT_COLOUR.items()
     ]
@@ -894,9 +928,9 @@ def _tab_graph() -> html.Div:
                 html.Div("LAYOUT", className="section-label"),
                 html.Div("CoSE (force-directed)",
                          style={"fontFamily": "JetBrains Mono, monospace",
-                                "fontSize": "10px", "color": "#e2e8f0"}),
+                                "fontSize": "10px", "color": "#e8edf5"}),
                 html.Div("Click a node to inspect · Drag to explore",
-                         style={"fontSize": "9px", "color": "#9cb3c9", "marginTop": "6px"}),
+                         style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "6px"}),
             ], className="war-card"), md=3),
         ], className="g-3"),
     ])
@@ -913,30 +947,144 @@ def _glob_reports() -> list[dict]:
     return [{"label": p.stem.replace("_", " ").title(), "value": str(p)} for p in paths]
 
 
+def _render_report_body(path: str | None) -> html.Div:
+    """Build the full styled report viewer for a given .md path."""
+    if not path:
+        return html.Div([
+            html.Div("📄", className="empty-state-icon"),
+            html.Div("No reports available", className="empty-state-title"),
+            html.Div(
+                "Generate a report by running the Sentinel pipeline, then place the .md file "
+                "in outputs/reports/ to register it here.",
+                className="empty-state-body",
+            ),
+        ], className="empty-state")
+
+    try:
+        content = Path(path).read_text(encoding="utf-8")
+    except OSError as exc:
+        log.error("_render_report_body: cannot read %s: %s", path, exc)
+        return html.P(f"Could not read report: {exc}",
+                      style={"color": "#ff6090", "fontSize": "12px", "padding": "16px"})
+
+    # Extract title and generated date from first lines if present
+    lines     = content.splitlines()
+    doc_title = lines[0].lstrip("# ").strip() if lines else Path(path).stem
+    doc_date  = ""
+    doc_class = "CONFIDENTIAL — C-SUITE ONLY"
+    for line in lines[1:6]:
+        if line.startswith("**Generated:**"):
+            doc_date = line.replace("**Generated:**", "").strip()
+        if line.startswith("**Classification:**"):
+            doc_class = line.replace("**Classification:**", "").strip()
+
+    # Strip first heading + metadata from content before rendering body
+    body_start = 0
+    for i, ln in enumerate(lines):
+        if i > 0 and ln.startswith("---"):
+            body_start = i + 1
+            break
+    body_md = "\n".join(lines[body_start:]) if body_start else content
+
+    return html.Div([
+        # ── Document header ──────────────────────────────────
+        html.Div([
+            html.Div([
+                html.Div(doc_class, className="report-classification"),
+                html.Div(doc_title, className="report-title"),
+                html.Div([
+                    html.Span("Generated: ", style={"color": "#3d4f62"}),
+                    html.Span(doc_date or "—", style={"color": "#7d8fa8"}),
+                    html.Span("  ·  Source: Fendt PESTEL-EL Sentinel",
+                              style={"color": "#3d4f62"}),
+                ], className="report-meta"),
+            ], className="report-doc-header-left"),
+        ], className="report-doc-header"),
+
+        # ── Report body ───────────────────────────────────────
+        dcc.Markdown(body_md, dangerously_allow_html=True, className="report-markdown"),
+    ])
+
+
+def _md_to_pdf_bytes(content: str) -> bytes:
+    """Convert markdown content to a PDF byte string using fpdf2."""
+    from fpdf import FPDF  # type: ignore[import]
+    import markdown as md_lib  # type: ignore[import]
+
+    html_body = md_lib.markdown(content, extensions=["tables", "fenced_code"])
+    # fpdf2's write_html understands <b>/<i> not <strong>/<em>
+    html_body = (
+        html_body
+        .replace("<strong>", "<b>").replace("</strong>", "</b>")
+        .replace("<em>", "<i>").replace("</em>", "</i>")
+        .replace("<blockquote>", "<p><i>  ").replace("</blockquote>", "</i></p>")
+        .replace("<code>", "").replace("</code>", "")
+        .replace("<pre>", "<p>").replace("</pre>", "</p>")
+        .replace("<del>", "").replace("</del>", "")
+    )
+
+    pdf = FPDF()
+    pdf.set_margins(25, 22, 25)
+    pdf.set_auto_page_break(auto=True, margin=20)
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=11)
+    pdf.write_html(html_body)
+    return bytes(pdf.output())
+
+
 def _tab_reports() -> html.Div:
     """Strategic Reports — Markdown viewer for AI-generated C-Suite briefs."""
     options = _glob_reports()
     default = options[0]["value"] if options else None
+    initial_body = _render_report_body(default)
+
     return html.Div([
         dbc.Row([
             dbc.Col([
-                html.Div("SELECT REPORT", className="section-label"),
-                dcc.Dropdown(
-                    id="reports-dropdown",
-                    options=options,
-                    value=default,
-                    clearable=False,
-                    placeholder="No reports found in outputs/reports/",
-                    style={"marginBottom": "20px"},
-                ),
-                html.Div(id="reports-body", className="war-card"),
+                # ── Toolbar ────────────────────────────────────
+                html.Div([
+                    html.Div([
+                        html.Div("SELECT REPORT", className="section-label",
+                                 style={"marginBottom": "6px"}),
+                        dcc.Dropdown(
+                            id="reports-dropdown",
+                            options=options,
+                            value=default,
+                            clearable=False,
+                            placeholder="No reports found in outputs/reports/",
+                        ),
+                    ], style={"flex": "1"}),
+                    dbc.Button(
+                        "⬇ Export PDF", id="reports-export-pdf-btn",
+                        color="secondary", size="sm", outline=True,
+                        className="btn-refresh",
+                        style={"alignSelf": "flex-end", "whiteSpace": "nowrap",
+                               "opacity": "1" if _PDF_OK else "0.35"},
+                        disabled=not _PDF_OK,
+                    ),
+                ], style={"display": "flex", "gap": "16px", "alignItems": "flex-end",
+                          "marginBottom": "20px"}),
+
+                # ── Report body ─────────────────────────────────
+                html.Div(initial_body, id="reports-body", className="war-card"),
             ], md=10),
+
             dbc.Col(html.Div([
                 html.Div("REPORTS", className="section-label"),
                 _metric("Available", str(len(options))),
                 html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
-                html.Div("Generated by Fendt Sentinel pipeline. Place .md files in outputs/reports/ to register them here.",
-                         style={"fontSize": "9px", "color": "#9cb3c9", "lineHeight": "1.6"}),
+                html.Div("PDF EXPORT", className="section-label"),
+                html.Div(
+                    "PDF export ready" if _PDF_OK else "Install fpdf2 + markdown to enable PDF export",
+                    style={"fontSize": "9px",
+                           "color": "#00e676" if _PDF_OK else "#3d4f62",
+                           "lineHeight": "1.6"},
+                ),
+                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
+                html.Div(
+                    "Place .md files in outputs/reports/ to register them here.",
+                    style={"fontSize": "9px", "color": "#3d4f62", "lineHeight": "1.6"},
+                ),
             ], className="war-card"), md=2),
         ], className="g-3"),
     ])
@@ -960,32 +1108,90 @@ def _lens_signal_card(sig: "Signal", score: float) -> html.Div:  # type: ignore[
     """Render a single signal result card for the Intelligence Lens."""
     relevance_pct = f"{score * 100:.0f}%"
     dim_col = _DIM_COLOUR.get(sig.pestel_dimension.value, "#9cb3c9")
+    bar_w   = max(4, int(score * 100))
     return html.Div([
         html.Div([
             html.Span(sig.pestel_dimension.value[:3],
                       style={"color": dim_col, "fontWeight": "700",
-                             "fontSize": "10px", "minWidth": "32px"}),
+                             "fontSize": "10px", "minWidth": "36px"}),
             html.Span(sig.title,
-                      style={"color": "#e2e8f0", "fontSize": "12px", "fontWeight": "600",
-                             "flex": "1", "lineHeight": "1.4"}),
-            html.Span(f"relevance {relevance_pct}",
-                      style={"color": "#9cb3c9", "fontSize": "9px",
+                      style={"color": "#e8edf5", "fontSize": "12.5px", "fontWeight": "600",
+                             "flex": "1", "lineHeight": "1.45"}),
+            html.Span(f"{relevance_pct}",
+                      style={"color": dim_col, "fontSize": "10px",
                              "fontFamily": "JetBrains Mono, monospace",
-                             "whiteSpace": "nowrap"}),
+                             "fontWeight": "700", "whiteSpace": "nowrap"}),
         ], style={"display": "flex", "gap": "10px", "alignItems": "flex-start",
-                  "marginBottom": "6px"}),
-        html.P(sig.content[:200] + ("…" if len(sig.content) > 200 else ""),
-               style={"fontSize": "11px", "color": "#9cb3c9", "margin": "0 0 6px 42px",
-                      "lineHeight": "1.6"}),
+                  "marginBottom": "8px"}),
+        # Relevance bar
+        html.Div(html.Div(style={
+            "height": "2px", "width": f"{bar_w}%",
+            "background": dim_col, "borderRadius": "1px",
+            "boxShadow": f"0 0 6px {dim_col}",
+        }), style={"background": "rgba(255,255,255,0.06)", "borderRadius": "1px",
+                   "marginBottom": "10px", "marginLeft": "46px"}),
+        html.P(sig.content[:220] + ("…" if len(sig.content) > 220 else ""),
+               style={"fontSize": "12px", "color": "#c4d0dc", "margin": "0 0 8px 46px",
+                      "lineHeight": "1.7"}),
         html.A(
-            "source →", href=sig.source_url, target="_blank",
-            style={"fontSize": "10px", "color": "#00e5ff", "marginLeft": "42px"},
+            "↗ verify source", href=sig.source_url, target="_blank",
+            className="source-link", style={"marginLeft": "46px"},
         ),
     ], className="war-card", style={"marginBottom": "10px"})
 
 
+def _run_lens_search(topic: str | None, custom: str | None = None) -> html.Div:
+    """Execute a semantic search and return result cards (or empty state)."""
+    is_custom = topic == "Custom Search…"
+    query     = (custom or "").strip() if is_custom else (topic or "").strip()
+
+    if not query:
+        return html.Div([
+            html.Div("🔍", className="empty-state-icon"),
+            html.Div("Enter a search query", className="empty-state-title"),
+            html.Div("Select a macro-trend topic above or type a custom query.",
+                     className="empty-state-body"),
+        ], className="empty-state")
+
+    try:
+        total_signals = len(_get_db().get_all())
+        if total_signals == 0:
+            return html.Div([
+                html.Div("○", className="empty-state-icon"),
+                html.Div("No signals in ChromaDB", className="empty-state-title"),
+                html.Div(
+                    'Click "Run Scout Now" in the sidebar to ingest intelligence. '
+                    "The Intelligence Lens will populate after the first scout cycle completes.",
+                    className="empty-state-body",
+                ),
+            ], className="empty-state")
+
+        results = _get_db().search(query, n_results=5)
+    except Exception as exc:
+        log.error("_run_lens_search crashed: %s", exc)
+        return html.P(f"Search error: {exc}",
+                      style={"color": "#ff6090", "fontSize": "12px"})
+
+    if not results:
+        return html.Div([
+            html.Div("○", className="empty-state-icon"),
+            html.Div(f'No matches for "{query}"', className="empty-state-title"),
+            html.Div("Try a broader query or run the Scout to ingest more signals.",
+                     className="empty-state-body"),
+        ], className="empty-state")
+
+    header = html.Div(
+        f'{len(results)} signal(s) matched · query: "{query}"',
+        style={"fontSize": "10px", "color": "#7d8fa8",
+               "fontFamily": "JetBrains Mono, monospace", "marginBottom": "14px"},
+    )
+    return html.Div([header, *[_lens_signal_card(sig, score) for sig, score in results]])
+
+
 def _tab_lens() -> html.Div:
     """Strategic Intelligence Lens — semantic deep-dive via ChromaDB search."""
+    initial_results = _run_lens_search(_LENS_PRESETS[0])
+
     return html.Div([
         dbc.Row([
             dbc.Col([
@@ -1007,23 +1213,27 @@ def _tab_lens() -> html.Div:
                     style={"marginBottom": "16px", "width": "100%"},
                 ),
                 dcc.Loading(
-                    html.Div(id="lens-results"),
+                    html.Div(initial_results, id="lens-results"),
                     type="circle", color="#00e5ff",
                 ),
             ], md=9),
             dbc.Col(html.Div([
                 html.Div("HOW IT WORKS", className="section-label"),
                 html.P(
-                    "The Intelligence Lens uses ChromaDB semantic search to surface the most "
-                    "relevant signals for any macro-trend query. Results are ranked by cosine "
-                    "similarity against the all-MiniLM-L6-v2 embedding model.",
-                    style={"fontSize": "10px", "color": "#9cb3c9", "lineHeight": "1.6"},
+                    "ChromaDB semantic search surfaces the most relevant signals for any "
+                    "macro-trend query. Results are ranked by cosine similarity using the "
+                    "all-MiniLM-L6-v2 embedding model.",
+                    style={"fontSize": "10.5px", "color": "#c4d0dc", "lineHeight": "1.7"},
                 ),
                 html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
                 html.Div("TOP-K", className="section-label"),
                 html.Div("5 signals per query",
                          style={"fontFamily": "JetBrains Mono, monospace",
-                                "fontSize": "10px", "color": "#e2e8f0"}),
+                                "fontSize": "10px", "color": "#e8edf5"}),
+                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
+                html.Div("TIP", className="section-label"),
+                html.Div('Select "Custom Search…" and type any free-form topic.',
+                         style={"fontSize": "9.5px", "color": "#7d8fa8", "lineHeight": "1.6"}),
             ], className="war-card"), md=3),
         ], className="g-3"),
     ])
@@ -1177,6 +1387,7 @@ app.layout = html.Div([
     # Persistent state
     dcc.Store(id="chat-store", data=[]),
     dcc.Download(id="export-download"),
+    dcc.Download(id="reports-pdf-download"),
     # 30-second auto-refresh (sponsor requirement #5)
     dcc.Interval(id="interval-30s", interval=30_000, n_intervals=0),
 ], className="war-shell")
@@ -1385,23 +1596,29 @@ def export_report(n_clicks: int):
 @app.callback(
     Output("reports-body", "children"),
     Input("reports-dropdown", "value"),
-    prevent_initial_call=False,
+    prevent_initial_call=True,   # initial content embedded by _tab_reports()
 )
 def render_report(path: str | None) -> html.Div:
-    if not path:
-        return html.P(
-            "No reports available. Generate a report via the pipeline, then place the .md file in outputs/reports/.",
-            style={"color": "#9cb3c9", "fontSize": "12px", "padding": "16px"},
-        )
+    return _render_report_body(path)
+
+
+@app.callback(
+    Output("reports-pdf-download", "data"),
+    Input("reports-export-pdf-btn", "n_clicks"),
+    State("reports-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def export_report_pdf(_n: int, path: str | None):
+    if not path or not _PDF_OK:
+        return no_update
     try:
-        content = Path(path).read_text(encoding="utf-8")
-        return dcc.Markdown(content, dangerously_allow_html=True, className="report-markdown")
-    except OSError as exc:
-        log.error("render_report: could not read %s: %s", path, exc)
-        return html.P(
-            f"Could not read report: {exc}",
-            style={"color": "#ff6090", "fontSize": "12px", "padding": "16px"},
-        )
+        content  = Path(path).read_text(encoding="utf-8")
+        pdf_bytes = _md_to_pdf_bytes(content)
+        filename  = f"{Path(path).stem}-{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf"
+        return dcc.send_bytes(pdf_bytes, filename)
+    except Exception as exc:
+        log.error("export_report_pdf failed: %s", exc)
+        return no_update
 
 
 # ── Intelligence Lens callback ────────────────────────────────
@@ -1411,36 +1628,10 @@ def render_report(path: str | None) -> html.Div:
     Input("lens-topic-dropdown", "value"),
     Input("lens-custom-input",   "value"),
     Input("lens-custom-input",   "n_submit"),
-    prevent_initial_call=False,
+    prevent_initial_call=True,   # initial content embedded by _tab_lens()
 )
 def lens_search(topic: str | None, custom: str | None, _ns: int) -> html.Div:
-    triggered = callback_context.triggered_id
-    query = (custom or "").strip() if (topic == "Custom Search…" or triggered == "lens-custom-input") else (topic or "")
-    if not query:
-        return html.P(
-            "Select a macro-trend or type a custom query above.",
-            style={"color": "#9cb3c9", "fontSize": "12px", "padding": "8px"},
-        )
-    try:
-        results = _get_db().search(query, n_results=5)
-    except Exception as exc:
-        log.error("lens_search crashed: %s", exc)
-        return html.P(
-            f"Search error: {exc}",
-            style={"color": "#ff6090", "fontSize": "12px"},
-        )
-    if not results:
-        return html.P(
-            f'No signals found for "{query}". Ingest more data via the Scout.',
-            style={"color": "#9cb3c9", "fontSize": "12px", "padding": "8px"},
-        )
-    header = html.Div(
-        f"{len(results)} signal(s) matched · query: \"{query}\"",
-        style={"fontSize": "10px", "color": "#9cb3c9",
-               "fontFamily": "JetBrains Mono, monospace", "marginBottom": "14px"},
-    )
-    cards = [_lens_signal_card(sig, score) for sig, score in results]
-    return html.Div([header, *cards])
+    return _run_lens_search(topic, custom)
 
 
 # ─────────────────────────────────────────────────────────────
