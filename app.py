@@ -38,6 +38,7 @@ import json
 import dash
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
+import diskcache
 
 # ── Optional PDF/Markdown rendering ───────────────────────────
 try:
@@ -49,6 +50,7 @@ except ImportError:
 import numpy as np
 import plotly.graph_objects as go
 from dash import Input, Output, State, callback_context, dcc, html, no_update
+from dash.long_callback import DiskcacheLongCallbackManager
 
 # ── Load .env ─────────────────────────────────────────────────
 try:
@@ -744,7 +746,12 @@ def _tab_chatbot(history: list[dict] | None = None) -> html.Div:
     return html.Div([
         dbc.Row([
             dbc.Col(html.Div([
-                html.Div(id="chat-messages", children=bubbles, className="chat-history"),
+                dcc.Loading(
+                    html.Div(id="chat-messages", children=bubbles, className="chat-history"),
+                    id="chat-messages-loading",
+                    type="dot",
+                    color="#00e5ff",
+                ),
                 html.Div([
                     dcc.Input(
                         id="chat-input", type="text",
@@ -1079,7 +1086,12 @@ def _tab_reports() -> html.Div:
                                 "marginBottom": "16px", "minHeight": "18px"}),
 
                 # ── Report body ─────────────────────────────────
-                html.Div(initial_body, id="reports-body", className="war-card"),
+                dcc.Loading(
+                    html.Div(initial_body, id="reports-body", className="war-card"),
+                    id="reports-body-loading",
+                    type="circle",
+                    color="#00e5ff",
+                ),
             ], md=10),
 
             dbc.Col(html.Div([
@@ -1324,6 +1336,12 @@ def _llm_chat(question: str, context_signals: list[Signal]) -> str:
 # App + Layout
 # ─────────────────────────────────────────────────────────────
 
+# Background-callback cache (DiskCache — survives hot-reload)
+_CACHE_DIR = Path(__file__).parent / "data" / ".dash_cache"
+_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+_disk_cache = diskcache.Cache(str(_CACHE_DIR))
+_long_callback_manager = DiskcacheLongCallbackManager(_disk_cache)
+
 app = dash.Dash(
     __name__,
     external_stylesheets=[
@@ -1333,6 +1351,7 @@ app = dash.Dash(
     ],
     suppress_callback_exceptions=True,
     title="Fendt Sentinel",
+    long_callback_manager=_long_callback_manager,
 )
 
 _TABS = [
@@ -1352,7 +1371,13 @@ sidebar = html.Div([
         html.Div("AGRO-MARKET INTELLIGENCE", className="sb-brand-sub"),
     ], className="sb-brand"),
 
-    html.Div(id="sidebar-body"),  # live metrics
+    dcc.Loading(
+        html.Div(id="sidebar-body"),
+        id="sidebar-body-loading",
+        type="dot",
+        color="#7d8fa8",
+        style={"minHeight": "40px"},
+    ),  # live metrics
 
     html.Div([
         dbc.Button("Run Scout Now", id="run-scout-btn", className="btn-scout",
@@ -1392,11 +1417,18 @@ app.layout = html.Div([
             ),
             className="war-tabnav",
         ),
-        html.Main(id="page-canvas", className="war-canvas"),
+        dcc.Loading(
+            html.Main(id="page-canvas", className="war-canvas"),
+            id="page-canvas-loading",
+            type="circle",
+            color="#00e5ff",
+            style={"position": "relative"},
+        ),
     ], className="war-main"),
 
     # Persistent state
-    dcc.Store(id="chat-store", data=[]),
+    dcc.Store(id="chat-store",    data=[]),
+    dcc.Store(id="signals-store", data=[], storage_type="memory"),  # cross-tab signal cache
     dcc.Download(id="export-download"),
     dcc.Download(id="reports-pdf-download"),
     # 30-second auto-refresh (sponsor requirement #5)
@@ -1407,6 +1439,32 @@ app.layout = html.Div([
 # ─────────────────────────────────────────────────────────────
 # Callbacks
 # ─────────────────────────────────────────────────────────────
+
+@app.callback(
+    Output("signals-store", "data"),
+    Input("interval-30s",   "n_intervals"),
+    Input("refresh-btn",    "n_clicks"),
+)
+def refresh_signals_store(_i: int, _n: int) -> list[dict]:
+    """Populate signals-store with top-50 signals every 30 s for cross-tab access."""
+    try:
+        db    = _get_db()
+        total = db.count()
+        if total == 0:
+            return []
+        results = db.search("EU agricultural market", n_results=min(50, total))
+        return [
+            {
+                "id":    s.id,
+                "title": s.title,
+                "dim":   s.pestel_dimension.value,
+                "score": s.disruption_score,
+            }
+            for s, _ in results
+        ]
+    except Exception:
+        return []
+
 
 @app.callback(
     Output("page-canvas", "children"),
@@ -1526,18 +1584,32 @@ def update_sidebar(_i: int, _n: int):
     return body, badge, ts
 
 
-@app.callback(
-    Output("chat-messages", "children"),
-    Output("chat-store",    "data"),
-    Output("chat-input",    "value"),
-    Input("chat-send",  "n_clicks"),
-    Input("chat-input", "n_submit"),
-    *[Input(f"chip-{i}", "n_clicks") for i in range(5)],
-    State("chat-input", "value"),
-    State("chat-store", "data"),
+@app.long_callback(
+    output=[
+        Output("chat-messages", "children"),
+        Output("chat-store",    "data"),
+        Output("chat-input",    "value"),
+    ],
+    inputs=[
+        Input("chat-send",  "n_clicks"),
+        Input("chat-input", "n_submit"),
+        Input("chip-0", "n_clicks"),
+        Input("chip-1", "n_clicks"),
+        Input("chip-2", "n_clicks"),
+        Input("chip-3", "n_clicks"),
+        Input("chip-4", "n_clicks"),
+    ],
+    state=[
+        State("chat-input", "value"),
+        State("chat-store", "data"),
+    ],
+    running=[
+        (Output("chat-send",  "disabled"), True, False),
+        (Output("chat-input", "disabled"), True, False),
+    ],
     prevent_initial_call=True,
 )
-def send_message(n_send, n_sub, *args):
+def send_message(n_send, n_sub, c0, c1, c2, c3, c4, question_val, history_data):
     chip_texts = [
         "What immediate supply chain pivots must Tier-1 OEMs make?",
         "Which EU regulations pose the highest 12-month compliance risk?",
@@ -1545,9 +1617,9 @@ def send_message(n_send, n_sub, *args):
         "How does CAP reform reshape the precision farming market?",
         "Which technology investments have the strongest ROI case?",
     ]
-    chip_clicks = args[:5]
-    question    = args[5] or ""
-    history     = list(args[6] or [])
+
+    question = question_val or ""
+    history  = list(history_data or [])
 
     triggered = callback_context.triggered_id
     if triggered and str(triggered).startswith("chip-"):
@@ -1632,14 +1704,25 @@ def export_report_pdf(_n: int, path: str | None):
         return no_update
 
 
-# ── Generate Intelligence Brief callback ─────────────────────
+# ── Generate Intelligence Brief callback (background) ─────────
 
-@app.callback(
-    Output("reports-dropdown",  "options"),
-    Output("reports-dropdown",  "value"),
-    Output("reports-body",      "children"),
-    Output("reports-gen-status","children"),
-    Input("reports-gen-btn", "n_clicks"),
+@app.long_callback(
+    output=[
+        Output("reports-dropdown",   "options"),
+        Output("reports-dropdown",   "value"),
+        Output("reports-body",       "children"),
+        Output("reports-gen-status", "children"),
+    ],
+    inputs=[Input("reports-gen-btn", "n_clicks")],
+    running=[
+        (Output("reports-gen-btn", "disabled"), True, False),
+        (
+            Output("reports-gen-status", "children"),
+            html.Span("⚙ Generating brief — LLM working…",
+                      style={"color": "#ffd93d", "fontSize": "11px"}),
+            "",
+        ),
+    ],
     prevent_initial_call=True,
 )
 def generate_intelligence_brief(n_clicks: int):
@@ -1670,7 +1753,7 @@ def generate_intelligence_brief(n_clicks: int):
         new_options = _glob_reports()
         new_value   = str(out_path)
         new_body    = _render_report_body(new_value)
-        status_msg  = f"Brief generated: {out_path.name}"
+        status_msg  = f"✓ Brief generated: {out_path.name}"
         return new_options, new_value, new_body, status_msg
 
     except Exception as exc:

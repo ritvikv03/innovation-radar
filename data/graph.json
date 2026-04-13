@@ -1,1 +1,48 @@
-{"directed": true, "nodes": [], "links": []}
+{
+  "directed": true,
+  "nodes": [
+    {
+      "id": "a2982434-6cb8-4b4f-b1d5-40ab1a107ab9",
+      "label": "EU agricultural income support: statistics",
+      "category": "ECONOMIC",
+      "created_at": "2026-04-13T07:56:41.976773+00:00",
+      "source": "https://ec.europa.eu/eurostat/databrowser/view/APRI_AP_INA/table/list"
+    },
+    {
+      "id": "beff14e4-73bd-48ec-a9c2-72478fde045f",
+      "label": "Regulation (EU) 2023/123/14 on specific rules relating to the entry into Norther",
+      "category": "LEGAL",
+      "created_at": "2026-04-13T07:57:21.766844+00:00",
+      "source": "https://eur-lex.europa.eu/legal-content/AUTO/?uri=CELEX:32023R1231"
+    },
+    {
+      "id": "c5ba6cb8-966f-4f6a-a6c0-eadc29b8ef86",
+      "label": "Climate change and agriculture",
+      "category": "ENVIRONMENTAL",
+      "created_at": "2026-04-13T07:59:06.068838+00:00",
+      "source": "https://www.eea.europa.eu/en/topics/in-depth/agriculture"
+    },
+    {
+      "id": "45761043-885e-437c-a515-aa2b6e7e17f0",
+      "label": "EU agricultural income support: 2017 data now available",
+      "category": "ECONOMIC",
+      "created_at": "2026-04-13T08:07:52.266921+00:00",
+      "source": "https://ec.europa.eu/eurostat/data/database"
+    },
+    {
+      "id": "b4a86f09-ffa3-4992-8c20-68c0507c1e67",
+      "label": "Robotics for sustainable agriculture: from farm to fork",
+      "category": "TECHNOLOGICAL",
+      "created_at": "2026-04-13T08:09:20.273874+00:00",
+      "source": "https://cordis.europa.eu/project/robotics-for-sustainable-agriculture/en"
+    },
+    {
+      "id": "98156444-f09d-40a9-b98a-19eaf9240ff7",
+      "label": "Impact of climate change on agriculture in Europe",
+      "category": "ENVIRONMENTAL",
+      "created_at": "2026-04-13T08:10:10.873807+00:00",
+      "source": "https://www.eea.europa.eu/en/topics/in-depth/agriculture"
+    }
+  ],
+  "links": []
+}
