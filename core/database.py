@@ -37,7 +37,11 @@ from typing import Optional
 
 from astrapy import DataAPIClient
 from astrapy.constants import VectorMetric
-from astrapy.info import CollectionVectorServiceOptions
+from astrapy.info import (
+    CollectionDefinition,
+    CollectionVectorOptions,
+    VectorServiceOptions,
+)
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 # ─── Constants ────────────────────────────────────────────────────────────────
@@ -269,10 +273,14 @@ class SignalDB:
 
         return self._db.create_collection(
             _COLLECTION_NAME,
-            metric=VectorMetric.COSINE,
-            service=CollectionVectorServiceOptions(
-                provider=_VECTORIZE_PROVIDER,
-                model_name=_VECTORIZE_MODEL,
+            definition=CollectionDefinition(
+                vector=CollectionVectorOptions(
+                    metric=VectorMetric.COSINE,
+                    service=VectorServiceOptions(
+                        provider=_VECTORIZE_PROVIDER,
+                        model_name=_VECTORIZE_MODEL,
+                    ),
+                )
             ),
         )
 

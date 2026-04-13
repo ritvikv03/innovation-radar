@@ -1329,18 +1329,23 @@ def _db_stats_cached() -> dict:
     """Cached DB stats — avoids a full get_all() on every sidebar tick."""
     try:
         signals = _get_all_signals_cached()
+        scores  = [s.disruption_score for s in signals]
         by_dim: dict[str, int] = {}
         for s in signals:
             dim = s.pestel_dimension.value
             by_dim[dim] = by_dim.get(dim, 0) + 1
         return {
-            "total":  len(signals),
-            "by_dim": by_dim,
-            "status": "ok",
+            "total":          len(signals),
+            "critical":       sum(1 for sc in scores if sc >= 0.75),
+            "high":           sum(1 for sc in scores if 0.50 <= sc < 0.75),
+            "avg_disruption": round(sum(scores) / len(scores), 3) if scores else 0.0,
+            "by_dim":         by_dim,
+            "status":         "ok",
         }
     except Exception as exc:
         log.warning("_db_stats_cached failed: %s", exc)
-        return {"total": 0, "by_dim": {}, "status": "error"}
+        return {"total": 0, "critical": 0, "high": 0, "avg_disruption": 0.0,
+                "by_dim": {}, "status": "error"}
 
 
 @_flask_cache.memoize(timeout=30)
