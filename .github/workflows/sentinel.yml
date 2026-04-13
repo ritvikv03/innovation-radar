@@ -1,51 +1,93 @@
-name: Fendt PESTEL-EL Sentinel
+name: Sentinel — Daily Intelligence Sweep
 
 on:
   schedule:
-    - cron: "0 0 * * *" # Run daily at midnight UTC
-  workflow_dispatch: # Allow manual trigger
+    # Midnight UTC every day
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Skip persistence (dry run)"
+        required: false
+        default: "false"
+
+env:
+  PYTHON_VERSION: "3.11"
 
 jobs:
-  run-pipeline:
+  scout-ingest:
+    name: Scout Ingestion
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # Required to push graph updates back to the repo
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
 
-      - name: Install Python Dependencies
-        run: |
-          pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-      - name: Run Sentinel Pipeline
-        run: |
-          python sentinel.py --run-once
+      - name: Run Scout pipeline
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          FIRE_CRAWL_API_KEY: ${{ secrets.FIRE_CRAWL_API_KEY }}
+          ASTRA_DB_TOKEN: ${{ secrets.ASTRA_DB_TOKEN }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python run_pipeline.py --scrape --all-sources
 
-      - name: Commit and Push Updates
+  analyst-brief:
+    name: Generate Analyst Brief
+    runs-on: ubuntu-latest
+    needs: scout-ingest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate strategic brief
         env:
-          RUN_DATE: ${{ github.run_id }}
+          ASTRA_DB_TOKEN: ${{ secrets.ASTRA_DB_TOKEN }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git config --global user.name "Sentinel Bot"
-          git config --global user.email "bot@fendt-innovation.ai"
-          # Stage pipeline artifacts — outputs/ (plural) is the canonical write path.
-          # q2_solution/data/signals.db tracks the SQLite temporal store.
-          git add \
-            outputs/ \
-            q2_solution/data/signals.db \
-            logs/sentinel.log \
-            data/graph.json \
-            data/sentinel_state.json || true
-          git commit -m "Autonomous Update: run-${RUN_DATE}" || echo "No changes to commit"
-          git push
+          python - <<'EOF'
+          from core.database import SignalDB
+          from core.summary_engine import generate_brief_markdown
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          db = SignalDB()
+          signals = db.get_all()
+          if not signals:
+              print("No signals in DB — skipping brief generation.")
+          else:
+              md = generate_brief_markdown(signals)
+              out_dir = Path("outputs/reports")
+              out_dir.mkdir(parents=True, exist_ok=True)
+              ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+              path = out_dir / f"Strategic_Brief_{ts}.md"
+              path.write_text(md, encoding="utf-8")
+              print(f"Brief written to {path} ({len(signals)} signals)")
+          EOF
+
+      - name: Upload brief as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: strategic-brief-${{ github.run_id }}
+          path: outputs/reports/
+          retention-days: 30
+          if-no-files-found: warn

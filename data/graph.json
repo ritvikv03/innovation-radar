@@ -42,6 +42,20 @@
       "category": "ENVIRONMENTAL",
       "created_at": "2026-04-13T08:10:10.873807+00:00",
       "source": "https://www.eea.europa.eu/en/topics/in-depth/agriculture"
+    },
+    {
+      "id": "ac42d8e9-c0d8-472b-999c-61942b3c7d0f",
+      "label": "Regulation (EU) 2023/123/14 on specific rules relating to the entry into Norther",
+      "category": "LEGAL",
+      "created_at": "2026-04-13T08:44:12.937886+00:00",
+      "source": "https://eur-lex.europa.eu/legal-content/EN/AUTO/?uri=CELEX:32023R1231"
+    },
+    {
+      "id": "c2c6c867-141f-41fc-826b-232e45990a1d",
+      "label": "Impact of climate change on agriculture in Europe",
+      "category": "ENVIRONMENTAL",
+      "created_at": "2026-04-13T08:45:53.562613+00:00",
+      "source": "https://www.eea.europa.eu/en/topics/in-depth/agriculture"
     }
   ],
   "links": []

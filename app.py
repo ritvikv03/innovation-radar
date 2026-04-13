@@ -39,6 +39,7 @@ import dash
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 import diskcache
+from flask_caching import Cache as _FlaskCache
 
 # ── Optional PDF/Markdown rendering ───────────────────────────
 try:
@@ -96,25 +97,7 @@ def _get_db() -> SignalDB:
     return _db
 
 
-def _db_stats() -> dict:
-    try:
-        signals = _get_db().get_all()
-        if not signals:
-            return {"total": 0, "critical": 0, "high": 0, "avg_disruption": 0.0, "by_dim": {}}
-        scores = [s.disruption_score for s in signals]
-        by_dim: dict[str, int] = {}
-        for s in signals:
-            by_dim[s.pestel_dimension.value] = by_dim.get(s.pestel_dimension.value, 0) + 1
-        return {
-            "total":          len(signals),
-            "critical":       sum(1 for sc in scores if sc >= 0.75),
-            "high":           sum(1 for sc in scores if 0.50 <= sc < 0.75),
-            "avg_disruption": round(sum(scores) / len(scores), 3),
-            "by_dim":         by_dim,
-        }
-    except Exception as exc:
-        log.error("_db_stats failed: %s", exc)
-        return {"total": 0, "critical": 0, "high": 0, "avg_disruption": 0.0, "by_dim": {}}
+# _db_stats() replaced by _db_stats_cached() (Flask-Caching, see below)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -384,8 +367,8 @@ def _chart_radar(signals: list[Signal],
 
 def _build_export_html() -> str:
     """Build a self-contained HTML report string for download."""
-    signals = _get_db().get_all()
-    stats   = _db_stats()
+    signals = _get_all_signals_cached()
+    stats   = _db_stats_cached()
     top10   = sorted(signals, key=lambda s: s.disruption_score, reverse=True)[:10]
     critical = [s for s in signals if s.disruption_score >= 0.75]
 
@@ -465,7 +448,7 @@ def _build_export_html() -> str:
 # ─────────────────────────────────────────────────────────────
 
 def _preflight() -> None:
-    signals = _get_db().get_all()
+    signals = _get_all_signals_cached()
     _chart_velocity(signals)
     _chart_pestel_bar(signals)
     _chart_histogram(signals)
@@ -569,8 +552,8 @@ def _urgency_matrix(signals: list[Signal]) -> html.Div:
 # ─────────────────────────────────────────────────────────────
 
 def _tab_overview() -> html.Div:
-    signals = _get_db().get_all()
-    stats   = _db_stats()
+    signals = _get_all_signals_cached()
+    stats   = _db_stats_cached()
     total   = stats["total"]
     top3    = sorted(signals, key=lambda s: s.disruption_score, reverse=True)[:3]
 
@@ -677,8 +660,8 @@ def _tab_radar() -> html.Div:
 
 
 def _tab_feed() -> html.Div:
-    signals = sorted(_get_db().get_all(), key=lambda s: s.date_ingested, reverse=True)
-    stats   = _db_stats()
+    signals = sorted(_get_all_signals_cached(), key=lambda s: s.date_ingested, reverse=True)
+    stats   = _db_stats_cached()
     by_dim  = stats.get("by_dim", {})
 
     return html.Div([
@@ -722,7 +705,7 @@ def _tab_feed() -> html.Div:
 
 
 def _tab_chatbot(history: list[dict] | None = None) -> html.Div:
-    db_count      = _db_stats()["total"]
+    db_count      = _db_stats_cached()["total"]
     hf_status = "Live" if _HF_OK else "No API key"
 
     welcome = _chat_bubble(
@@ -899,7 +882,7 @@ def _render_causal_chains() -> list:
 
 def _tab_graph() -> html.Div:
     """Knowledge Graph — causal interdependency visualisation."""
-    elements   = _load_graph_elements()
+    elements   = _load_graph_elements_cached()
     node_count = sum(1 for e in elements if "source" not in e.get("data", {}))
     edge_count = len(elements) - node_count
 
@@ -1213,7 +1196,7 @@ def _run_lens_search(topic: str | None, custom: str | None = None) -> html.Div:
         ], className="empty-state")
 
     try:
-        total_signals = len(_get_db().get_all())
+        total_signals = len(_get_all_signals_cached())
         if total_signals == 0:
             return html.Div([
                 html.Div("○", className="empty-state-icon"),
@@ -1325,6 +1308,46 @@ app = dash.Dash(
     title="Fendt Sentinel",
     long_callback_manager=_long_callback_manager,
 )
+
+# ── Flask-Caching — memoize expensive DB + graph calls ────────
+# SimpleCache keeps results in-process (no Redis needed for single-worker Dash).
+# 30-second TTL aligns with the auto-refresh interval.
+_flask_cache = _FlaskCache(
+    app.server,
+    config={"CACHE_TYPE": "SimpleCache", "CACHE_DEFAULT_TIMEOUT": 30},
+)
+
+
+@_flask_cache.memoize(timeout=30)
+def _get_all_signals_cached() -> list:
+    """Cached get_all() — avoids hitting Astra DB on every tab render."""
+    return _get_db().get_all()
+
+
+@_flask_cache.memoize(timeout=30)
+def _db_stats_cached() -> dict:
+    """Cached DB stats — avoids a full get_all() on every sidebar tick."""
+    try:
+        signals = _get_all_signals_cached()
+        by_dim: dict[str, int] = {}
+        for s in signals:
+            dim = s.pestel_dimension.value
+            by_dim[dim] = by_dim.get(dim, 0) + 1
+        return {
+            "total":  len(signals),
+            "by_dim": by_dim,
+            "status": "ok",
+        }
+    except Exception as exc:
+        log.warning("_db_stats_cached failed: %s", exc)
+        return {"total": 0, "by_dim": {}, "status": "error"}
+
+
+@_flask_cache.memoize(timeout=30)
+def _load_graph_elements_cached() -> list[dict]:
+    """Cached graph.json parse — prevents re-reading file on every graph tab load."""
+    return _load_graph_elements()
+
 
 _TABS = [
     ("overview", "Field Intelligence"),
@@ -1478,7 +1501,7 @@ def render_tab(tab: str, _i: int, _n: int, history: list) -> html.Div:
 )
 def update_radar(dim_filter: str, min_score: float, _i: int, _n: int) -> go.Figure:
     try:
-        return _chart_radar(_get_db().get_all(), dim_filter or "All", min_score or 0.50)
+        return _chart_radar(_get_all_signals_cached(), dim_filter or "All", min_score or 0.50)
     except Exception as exc:
         log.error("update_radar crashed: %s", exc)
         return go.Figure()
@@ -1492,7 +1515,7 @@ def update_radar(dim_filter: str, min_score: float, _i: int, _n: int) -> go.Figu
     Input("refresh-btn",   "n_clicks"),
 )
 def update_sidebar(_i: int, _n: int):
-    stats    = _db_stats()
+    stats    = _db_stats_cached()
     total    = stats["total"]
     by_dim   = stats.get("by_dim", {})
 
@@ -1626,7 +1649,7 @@ def send_message(n_send, n_sub, c0, c1, c2, c3, c4, question_val, history_data):
 
     welcome = _chat_bubble(
         f"Fendt Relational Brain — Multi-Agent Strategic Advisor\n\n"
-        f"{_db_stats()['total']} signal(s) in Astra DB. "
+        f"{_db_stats_cached()['total']} signal(s) in Astra DB. "
         f"Router automatically directs queries to the Calculator Agent "
         f"(quantitative) or Analyst Agent (synthesis).",
         role="assistant",
@@ -1782,7 +1805,7 @@ if __name__ == "__main__":
     _preflight()
 
     _scheduler_engine.start()
-    stats = _db_stats()
+    stats = _db_stats_cached()
     log.info("App starting — Astra DB: %d signals, HuggingFace: %s",
              stats["total"], "OK" if _HF_OK else "NO KEY")
 
