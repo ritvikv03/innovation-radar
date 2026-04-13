@@ -24,8 +24,6 @@ import re
 import textwrap
 from typing import Optional
 
-from langchain_huggingface import HuggingFaceEndpoint
-from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field, field_validator
 
 from core.database import PESTELDimension, Signal, SignalDB
@@ -35,31 +33,13 @@ from core.utils import retry_with_backoff
 log = get_logger(__name__)
 
 # ─── HuggingFace setup ────────────────────────────────────────────────────────
+# Use InferenceClient.chat_completion() — the same path as the chat tab.
+# This targets the `conversational` provider task, avoiding the
+# `text-generation` endpoint that novita does not expose for this model.
 
 _HF_TOKEN       = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
-_HF_REPO_ID     = "mistralai/Mistral-7B-Instruct-v0.3"
+_HF_REPO_ID     = "HuggingFaceH4/zephyr-7b-beta"   # consistent with app.py chat
 _MAX_NEW_TOKENS = 1024
-
-# Module-level singletons — instantiated once, reused across calls
-_prompt_template: "PromptTemplate | None" = None
-_llm_endpoint: "HuggingFaceEndpoint | None" = None
-
-
-def _get_chain():
-    """Lazy-initialise LangChain chain (once per process)."""
-    global _prompt_template, _llm_endpoint
-    if _llm_endpoint is None:
-        _prompt_template = PromptTemplate.from_template(
-            "[INST] " + _SYSTEM_PROMPT + "\n\n" + _USER_TEMPLATE + " [/INST]"
-        )
-        _llm_endpoint = HuggingFaceEndpoint(
-            repo_id=_HF_REPO_ID,
-            huggingfacehub_api_token=_HF_TOKEN,
-            max_new_tokens=_MAX_NEW_TOKENS,
-            temperature=0.2,
-            timeout=60,
-        )
-    return _prompt_template | _llm_endpoint
 
 
 # ─── LLM response schema (strict Pydantic) ────────────────────────────────────
@@ -208,7 +188,11 @@ def _is_duplicate(text: str, db: SignalDB) -> bool:
 
 def _call_llm(text: str, max_input_chars: int = 8_000) -> LLMScoreResponse:
     """
-    Send text to HuggingFace Inference API via LangChain, parse JSON response.
+    Send text to HuggingFace via InferenceClient.chat_completion() and
+    parse the JSON scoring response.
+
+    Uses the `conversational` task (chat_completion), which works across
+    all HuggingFace inference providers including novita.
 
     Raises
     ------
@@ -225,24 +209,30 @@ def _call_llm(text: str, max_input_chars: int = 8_000) -> LLMScoreResponse:
     if len(text) > max_input_chars:
         truncated += "\n\n[... article truncated for analysis ...]"
 
-    chain = _get_chain()
+    user_content = _USER_TEMPLATE.format(text=truncated)
+    messages = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user",   "content": user_content},
+    ]
 
     log.info("Calling HuggingFace (%s) — text_len=%d chars", _HF_REPO_ID, len(truncated))
-    try:
-        raw_text = retry_with_backoff(
-            lambda: chain.invoke({"text": truncated}),
-            max_attempts=3,
-            base_delay=4.0,
+
+    def _invoke() -> str:
+        from huggingface_hub import InferenceClient  # local import — avoids circular deps
+        client   = InferenceClient(api_key=_HF_TOKEN)
+        response = client.chat_completion(
+            model=_HF_REPO_ID,
+            messages=messages,
+            max_tokens=_MAX_NEW_TOKENS,
+            temperature=0.2,
         )
+        return response.choices[0].message.content.strip()
+
+    try:
+        raw_text = retry_with_backoff(_invoke, max_attempts=3, base_delay=4.0)
     except (RuntimeError, ValueError, OSError) as exc:
         log.error("HuggingFace API error after retries: %s", exc)
         raise RuntimeError(f"HuggingFace API error: {exc}") from exc
-
-    if hasattr(raw_text, "content"):
-        raw_text = raw_text.content
-    if isinstance(raw_text, list):
-        raw_text = " ".join(str(part) for part in raw_text)
-    raw_text = str(raw_text).strip()
 
     json_str = _extract_json(raw_text)
 

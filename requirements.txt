@@ -87,3 +87,8 @@ langchain>=0.3.0,<0.4
 langchain-huggingface>=0.1.0,<0.2
 langgraph>=0.2.0,<0.3
 huggingface_hub>=0.24.0,<1.0
+# ── Knowledge Graph visualisation ───────────────────────────────────────────
+dash-cytoscape>=0.3.0
+# ── Report rendering + PDF export ───────────────────────────────────────────
+markdown>=3.5.0
+fpdf2>=2.7.0
