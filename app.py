@@ -64,9 +64,10 @@ except ImportError:
                 os.environ.setdefault(k.strip(), v.strip())
 
 sys.path.insert(0, str(Path(__file__).parent))
-from core.database  import PESTELDimension, Signal, SignalDB
-from core.scheduler import HEALTH, engine as _scheduler_engine
-from core.logger    import get_logger
+from core.database       import PESTELDimension, Signal, SignalDB
+from core.scheduler      import HEALTH, engine as _scheduler_engine
+from core.logger         import get_logger
+from core.summary_engine import generate_brief_markdown
 
 log = get_logger(__name__)
 
@@ -76,7 +77,7 @@ log = get_logger(__name__)
 
 _HF_TOKEN   = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
 _HF_OK      = bool(_HF_TOKEN)
-_HF_REPO_ID = "mistralai/Mistral-7B-Instruct-v0.3"
+_HF_REPO_ID = "meta-llama/Llama-3.2-3B-Instruct"
 
 # ─────────────────────────────────────────────────────────────
 # DB singleton — all access via SignalDB (CLAUDE.md rule)
@@ -1055,6 +1056,13 @@ def _tab_reports() -> html.Div:
                         ),
                     ], style={"flex": "1"}),
                     dbc.Button(
+                        "✦ Generate New Intelligence Brief",
+                        id="reports-gen-btn",
+                        color="primary", size="sm",
+                        className="btn-refresh",
+                        style={"alignSelf": "flex-end", "whiteSpace": "nowrap"},
+                    ),
+                    dbc.Button(
                         "⬇ Export PDF", id="reports-export-pdf-btn",
                         color="secondary", size="sm", outline=True,
                         className="btn-refresh",
@@ -1063,7 +1071,12 @@ def _tab_reports() -> html.Div:
                         disabled=not _PDF_OK,
                     ),
                 ], style={"display": "flex", "gap": "16px", "alignItems": "flex-end",
-                          "marginBottom": "20px"}),
+                          "marginBottom": "12px"}),
+
+                # ── Generation status ───────────────────────────
+                html.Div("", id="reports-gen-status",
+                         style={"fontSize": "11px", "color": "#7d8fa8",
+                                "marginBottom": "16px", "minHeight": "18px"}),
 
                 # ── Report body ─────────────────────────────────
                 html.Div(initial_body, id="reports-body", className="war-card"),
@@ -1284,27 +1297,25 @@ def _llm_chat(question: str, context_signals: list[Signal]) -> str:
             for i, s in enumerate(context_signals, 1)
         ) if context_signals else "No matching signals found in ChromaDB."
     )
-    prompt = (
-        f"[INST] {_CHAT_SYSTEM}\n\n"
-        f"INTELLIGENCE CONTEXT:\n{context}\n\n"
-        f"STRATEGIC QUESTION: {question}\n\n"
-        f"UNIVERSAL STRATEGIC ANALYSIS: [/INST]"
-    )
     try:
-        from langchain_huggingface import HuggingFaceEndpoint
-        llm = HuggingFaceEndpoint(
-            repo_id=_HF_REPO_ID,
-            huggingfacehub_api_token=_HF_TOKEN,
-            max_new_tokens=600,
+        from huggingface_hub import InferenceClient
+        client = InferenceClient(api_key=_HF_TOKEN)
+        response = client.chat_completion(
+            model=_HF_REPO_ID,
+            messages=[
+                {"role": "system", "content": _CHAT_SYSTEM},
+                {
+                    "role": "user",
+                    "content": (
+                        f"INTELLIGENCE CONTEXT:\n{context}\n\n"
+                        f"STRATEGIC QUESTION: {question}"
+                    ),
+                },
+            ],
+            max_tokens=600,
             temperature=0.25,
-            timeout=60,
         )
-        result = llm.invoke(prompt)
-        if hasattr(result, "content"):
-            result = result.content
-        if isinstance(result, list):
-            result = " ".join(str(p) for p in result)
-        return str(result).strip()
+        return response.choices[0].message.content.strip()
     except Exception as exc:
         return f"LLM error: {exc}"
 
@@ -1619,6 +1630,52 @@ def export_report_pdf(_n: int, path: str | None):
     except Exception as exc:
         log.error("export_report_pdf failed: %s", exc)
         return no_update
+
+
+# ── Generate Intelligence Brief callback ─────────────────────
+
+@app.callback(
+    Output("reports-dropdown",  "options"),
+    Output("reports-dropdown",  "value"),
+    Output("reports-body",      "children"),
+    Output("reports-gen-status","children"),
+    Input("reports-gen-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def generate_intelligence_brief(n_clicks: int):
+    """Fetch top 10 signals, call generate_brief_markdown, write .md, refresh dropdown."""
+    try:
+        db = SignalDB()
+        total = db.count()
+        if total == 0:
+            return no_update, no_update, no_update, "No signals in database — run Scout first."
+
+        # Retrieve top 10 by disruption score
+        results = db.search("agricultural market disruption EU Fendt", n_results=min(10, total))
+        signals = [sig for sig, _ in results]
+
+        # Sort descending by disruption score
+        signals.sort(key=lambda s: s.disruption_score, reverse=True)
+
+        md_text = generate_brief_markdown(signals)
+
+        # Write to outputs/reports/
+        _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        ts_str  = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        out_path = _REPORTS_DIR / f"Strategic_Brief_{ts_str}.md"
+        out_path.write_text(md_text, encoding="utf-8")
+        log.info("Generated brief: %s", out_path.name)
+
+        # Refresh dropdown
+        new_options = _glob_reports()
+        new_value   = str(out_path)
+        new_body    = _render_report_body(new_value)
+        status_msg  = f"Brief generated: {out_path.name}"
+        return new_options, new_value, new_body, status_msg
+
+    except Exception as exc:
+        log.error("generate_intelligence_brief failed: %s", exc)
+        return no_update, no_update, no_update, f"Error: {exc}"
 
 
 # ── Intelligence Lens callback ────────────────────────────────

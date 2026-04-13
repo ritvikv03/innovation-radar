@@ -38,7 +38,7 @@ log = get_logger(__name__)
 # `text-generation` endpoint that novita does not expose for this model.
 
 _HF_TOKEN       = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
-_HF_REPO_ID     = "HuggingFaceH4/zephyr-7b-beta"   # consistent with app.py chat
+_HF_REPO_ID     = "meta-llama/Llama-3.2-3B-Instruct"
 _MAX_NEW_TOKENS = 1024
 
 

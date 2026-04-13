@@ -32,7 +32,7 @@ log = get_logger(__name__)
 
 _GRAPH_JSON_PATH = Path(__file__).parent.parent / "data" / "graph.json"
 _HF_TOKEN        = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
-_HF_REPO_ID      = "mistralai/Mistral-7B-Instruct-v0.3"
+_HF_REPO_ID      = "meta-llama/Llama-3.2-3B-Instruct"
 
 _VALID_RELATIONSHIPS = {
     "ACCELERATES", "CONFLICTS_WITH", "DRIVES", "AMPLIFIES",
@@ -112,36 +112,41 @@ def identify_edges(state: GraphState) -> GraphState:
     edges: list[dict] = []
 
     try:
-        from langchain_huggingface import HuggingFaceEndpoint
+        from huggingface_hub import InferenceClient
 
-        llm = HuggingFaceEndpoint(
-            repo_id=_HF_REPO_ID,
-            huggingfacehub_api_token=_HF_TOKEN,
-            max_new_tokens=32,
-            temperature=0.1,
-            timeout=45,
-        )
+        client = InferenceClient(api_key=_HF_TOKEN)
 
         for match in matches:
             hist = match["signal"]
-            prompt = (
-                f"[INST] You are an agricultural policy analyst. Given two intelligence signals:\n\n"
-                f"SIGNAL A: {sig['title']}\n"
-                f"SIGNAL B: {hist['title']}\n\n"
-                f"Choose the ONE relationship word that best describes how A relates to B:\n"
-                f"ACCELERATES | CONFLICTS_WITH | DRIVES | AMPLIFIES | INCREASES | DECREASES | DEPENDS_ON\n\n"
-                f"Respond with ONLY the relationship word. Nothing else. [/INST]"
-            )
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an agricultural policy analyst. "
+                        "Respond with ONLY a single relationship word from the list provided. "
+                        "No explanation, no punctuation — just the word."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Signal A: {sig['title']}\n"
+                        f"Signal B: {hist['title']}\n\n"
+                        f"Choose ONE: ACCELERATES | CONFLICTS_WITH | DRIVES | AMPLIFIES | "
+                        f"INCREASES | DECREASES | DEPENDS_ON"
+                    ),
+                },
+            ]
 
             try:
-                result = llm.invoke(prompt)
-                if hasattr(result, "content"):
-                    result = result.content
-                if isinstance(result, list):
-                    result = " ".join(str(p) for p in result)
-                rel = str(result).strip().upper()
+                response = client.chat_completion(
+                    model=_HF_REPO_ID,
+                    messages=messages,
+                    max_tokens=16,
+                    temperature=0.1,
+                )
+                rel = response.choices[0].message.content.strip().upper()
 
-                # Extract first matching keyword if model adds extra text
                 matched_rel = "DEPENDS_ON"
                 for candidate in _VALID_RELATIONSHIPS:
                     if candidate in rel:
@@ -186,11 +191,14 @@ def update_graph(state: GraphState) -> GraphState:
 
         existing_node_ids: set[str] = {n["id"] for n in graph.get("nodes", [])}
 
+        def _short(title: str) -> str:
+            return title[:35] + "..." if len(title) > 35 else title
+
         # Upsert the incoming signal as a node
         if sig["id"] not in existing_node_ids:
             graph["nodes"].append({
                 "id":         sig["id"],
-                "label":      sig["title"][:80],
+                "label":      _short(sig["title"]),
                 "category":   sig["pestel_dimension"],
                 "created_at": sig.get("date_ingested", ""),
                 "source":     sig.get("source_url", ""),
@@ -202,7 +210,7 @@ def update_graph(state: GraphState) -> GraphState:
             if hist["id"] not in existing_node_ids:
                 graph["nodes"].append({
                     "id":         hist["id"],
-                    "label":      hist["title"][:80],
+                    "label":      _short(hist["title"]),
                     "category":   hist["pestel_dimension"],
                     "created_at": hist.get("date_ingested", ""),
                     "source":     hist.get("source_url", ""),
