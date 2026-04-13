@@ -70,6 +70,8 @@ from core.database       import PESTELDimension, Signal, SignalDB
 from core.scheduler      import HEALTH, engine as _scheduler_engine
 from core.logger         import get_logger
 from core.summary_engine import generate_brief_markdown
+from core.agents         import run_agent_query
+from core.graph_engine   import get_causal_chains
 
 log = get_logger(__name__)
 
@@ -866,6 +868,35 @@ def _load_graph_elements() -> list[dict]:
     return elements
 
 
+def _render_causal_chains() -> list:
+    """Build sidebar widgets for the top causal cascade chains."""
+    chains = get_causal_chains(top_n=5)
+    if not chains:
+        return [html.Div(
+            "No cascade chains yet — chains build as signals relate to each other.",
+            style={"fontSize": "9px", "color": "#3d4f62", "lineHeight": "1.6"},
+        )]
+    items = []
+    for c in chains:
+        arrow_chain = " → ".join(
+            f'<span style="color:{_CAT_COLOUR.get(p, "#7d8fa8")}">{p[:3]}</span>'
+            for p in c["chain"]
+        )
+        items.append(html.Div([
+            html.Div(
+                f"depth {c['depth']}  ·  {c['predicate']}",
+                style={"fontSize": "9px", "color": "#7d8fa8", "fontFamily": "JetBrains Mono, monospace"},
+            ),
+            html.Div(
+                dangerously_allow_html=True,
+                children=arrow_chain,
+                style={"fontSize": "10px", "marginTop": "2px"},
+            ),
+        ], style={"marginBottom": "8px", "paddingLeft": "4px",
+                  "borderLeft": "2px solid rgba(0,229,255,0.3)"}))
+    return items
+
+
 def _tab_graph() -> html.Div:
     """Knowledge Graph — causal interdependency visualisation."""
     elements   = _load_graph_elements()
@@ -929,6 +960,9 @@ def _tab_graph() -> html.Div:
                 _metric("Nodes", str(node_count)),
                 html.Div(style={"height": "8px"}),
                 _metric("Edges", str(edge_count)),
+                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
+                html.Div("CAUSAL CHAINS", className="section-label"),
+                *_render_causal_chains(),
                 html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
                 html.Div("DIMENSION KEY", className="section-label"),
                 *legend,
@@ -1265,71 +1299,9 @@ def _tab_lens() -> html.Div:
 
 
 # ─────────────────────────────────────────────────────────────
-# HuggingFace Strategic Chat Helper (sponsor requirement #3)
+# Strategic Chat — delegated to Multi-Agent Relational Brain
+# (core/agents.py: Router → Calculator Agent | Analyst Agent)
 # ─────────────────────────────────────────────────────────────
-
-_CHAT_SYSTEM = textwrap.dedent("""\
-    You are a strategic intelligence analyst serving Tier-1 Agricultural OEM leadership
-    (AGCO, CNH Industrial, John Deere, Claas, Kubota equivalent).
-
-    ANALYSIS FRAMEWORK — structure every response as:
-    1. SIGNAL FINDING: What macro-level force is operating?
-    2. INDUSTRY IMPLICATION: How does this affect ALL Tier-1 Agricultural OEMs globally?
-    3. STRATEGIC RECOMMENDATION: What universal, actionable decisions must OEM leadership make?
-
-    UNIVERSAL STRATEGIC ACTIONS to consider:
-    - Supply chain pivots and dual-sourcing strategies
-    - M&A targets and technology partnership candidates
-    - TCO positioning and fleet electrification timelines
-    - Regulatory compliance investment priorities
-    - Precision agriculture platform decisions
-    - Market entry/exit timing for EU segments
-
-    STRICT RULES:
-    - Cite specific signal titles and disruption scores when referencing data.
-    - DO NOT write company-specific marketing copy or brand-specific recommendations.
-    - DO NOT name specific companies as "winners" or "losers" without signal evidence.
-    - Write decisions that any Tier-1 OEM C-suite can act on universally.
-    - Maximum 220 words. Be direct, strategic, and decisive.
-""")
-
-
-def _llm_chat(question: str, context_signals: list[Signal]) -> str:
-    """Call HuggingFace model for strategic chat analysis."""
-    if not _HF_OK:
-        return "HuggingFace API token not configured. Set HUGGINGFACEHUB_API_TOKEN in your .env file."
-
-    context = (
-        "\n\n".join(
-            f"[Signal {i}] {s.title}\n"
-            f"  Dimension: {s.pestel_dimension.value}\n"
-            f"  Disruption Score: {s.disruption_score:.3f}\n"
-            f"  Content: {s.content}\n"
-            f"  Source: {s.source_url}"
-            for i, s in enumerate(context_signals, 1)
-        ) if context_signals else "No matching signals found in Astra DB."
-    )
-    try:
-        from huggingface_hub import InferenceClient
-        client = InferenceClient(api_key=_HF_TOKEN)
-        response = client.chat_completion(
-            model=_HF_REPO_ID,
-            messages=[
-                {"role": "system", "content": _CHAT_SYSTEM},
-                {
-                    "role": "user",
-                    "content": (
-                        f"INTELLIGENCE CONTEXT:\n{context}\n\n"
-                        f"STRATEGIC QUESTION: {question}"
-                    ),
-                },
-            ],
-            max_tokens=600,
-            temperature=0.25,
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as exc:
-        return f"LLM error: {exc}"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1635,18 +1607,46 @@ def send_message(n_send, n_sub, c0, c1, c2, c3, c4, question_val, history_data):
     except Exception:
         context = []
 
-    answer = _llm_chat(question, context)
+    # ── Multi-Agent routing ───────────────────────────────────────────────────
+    agent_result = run_agent_query(question, context)
+    answer       = agent_result.get("final_answer", "Agent returned no answer.")
+    route        = agent_result.get("route", "synthesis")
+    trace        = agent_result.get("agent_trace", [])
+    confidence   = agent_result.get("confidence", "medium")
+
+    # Prepend route badge so the user can see which agent responded
+    route_label = "QUANTITATIVE · Calculator" if route == "quantitative" else "SYNTHESIS · Analyst"
+    conf_colour = {"high": "#00e676", "medium": "#ffd93d", "low": "#ff6090"}.get(confidence, "#7d8fa8")
+    badge_text  = f"[{route_label}  ·  confidence={confidence}  ·  agents={' → '.join(trace)}]"
 
     history.append({"role": "user",      "text": question})
-    history.append({"role": "assistant", "text": answer})
+    history.append({"role": "assistant", "text": answer, "badge": badge_text, "badge_colour": conf_colour})
     if len(history) > 20:
         history = history[-20:]
 
     welcome = _chat_bubble(
-        f"Fendt Intelligence Assistant · {_db_stats()['total']} signal(s) indexed.",
+        f"Fendt Relational Brain — Multi-Agent Strategic Advisor\n\n"
+        f"{_db_stats()['total']} signal(s) in Astra DB. "
+        f"Router automatically directs queries to the Calculator Agent "
+        f"(quantitative) or Analyst Agent (synthesis).",
         role="assistant",
     )
-    bubbles = [welcome] + [_chat_bubble(m["text"], m["role"]) for m in history]
+    bubbles = [welcome]
+    for msg in history:
+        bubble = _chat_bubble(msg["text"], msg["role"])
+        if msg["role"] == "assistant" and msg.get("badge"):
+            badge = html.Div(
+                msg["badge"],
+                style={
+                    "fontSize": "9px",
+                    "fontFamily": "JetBrains Mono, monospace",
+                    "color": msg.get("badge_colour", "#7d8fa8"),
+                    "marginTop": "6px",
+                    "opacity": "0.75",
+                },
+            )
+            bubble = html.Div([bubble, badge])
+        bubbles.append(bubble)
     return bubbles, history, ""
 
 
