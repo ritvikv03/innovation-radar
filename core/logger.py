@@ -6,7 +6,7 @@ Usage:
     log = get_logger(__name__)
     log.info("Pipeline started")
     log.warning("Gemini quota low")
-    log.error("ChromaDB unreachable: %s", exc)
+    log.error("Astra DB unreachable: %s", exc)
 
 All log records go to:
   - logs/agent.log  (rotating, 5 MB × 3 backups, always)
@@ -64,7 +64,8 @@ def _configure_root() -> None:
 
     # Silence noisy third-party loggers
     for noisy in ("werkzeug", "dash", "dash.dash", "httpx",
-                  "urllib3", "chromadb", "apscheduler.executors"):
+                  "urllib3", "astrapy", "httpcore",
+                  "apscheduler.executors"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 

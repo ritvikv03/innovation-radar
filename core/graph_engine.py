@@ -7,7 +7,7 @@ Flow
 ----
   Signal
     → [Node 1] receive_signal  : validates & wraps input state
-    → [Node 2] rag_query       : fetches top-2 semantically related signals from ChromaDB
+    → [Node 2] rag_query       : fetches top-2 semantically related signals from Astra DB
     → [Node 3] identify_edges  : asks HuggingFace model to name relationships
     → [Node 4] update_graph    : appends nodes/edges to data/graph.json
 

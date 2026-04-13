@@ -82,6 +82,8 @@ zipp==3.23.0
 # ── Added for Tab 6 export formats ──────────────────────────────────────────
 openpyxl>=3.1.0
 python-docx>=0.8.11
+# ── Vector store (Astra DB + Astra Vectorize) ────────────────────────────────
+astrapy>=1.5.0
 # ── AI / LLM stack (HuggingFace + LangChain) ────────────────────────────────
 langchain>=0.3.0,<0.4
 langchain-huggingface>=0.1.0,<0.2

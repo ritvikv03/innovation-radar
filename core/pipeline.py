@@ -2,7 +2,7 @@
 core/pipeline.py — Fendt PESTEL-EL Sentinel: Scoring Pipeline
 ==============================================================
 Takes raw text (news article, report snippet, any string) and
-returns a fully-validated Signal ready for ChromaDB insertion.
+returns a fully-validated Signal ready for Astra DB insertion.
 
 Flow
 ----
@@ -13,7 +13,7 @@ Flow
 Public API
 ----------
   score_text(text)        → Signal
-  score_and_save(text, db) → Signal   (also persists to ChromaDB)
+  score_and_save(text, db) → Signal   (also persists to Astra DB)
 """
 
 from __future__ import annotations
@@ -183,7 +183,7 @@ _DEDUP_THRESHOLD = 0.08   # cosine distance; lower = more similar. Tune here.
 
 def _is_duplicate(text: str, db: SignalDB) -> bool:
     """
-    Return True if ChromaDB already contains a semantically near-identical document.
+    Return True if Astra DB already contains a semantically near-identical document.
 
     Uses cosine distance from ChromaDB (range 0–2, lower = more similar).
     A threshold of 0.08 catches rephrased duplicates of the same article
@@ -301,7 +301,7 @@ def score_and_save(
     text: str, db: Optional[SignalDB] = None
 ) -> Optional[tuple[Signal, LLMScoreResponse]]:
     """
-    Score text and persist to ChromaDB.
+    Score text and persist to Astra DB.
 
     Returns None if the text is a near-duplicate of an existing signal.
     Returns (Signal, LLMScoreResponse) otherwise.

@@ -6,7 +6,7 @@ Architecture rules (CLAUDE.md):
   - Callbacks are pure functions. No global state mutation.
   - All Plotly colors use rgba() — never 8-char hex (#rrggbbaa).
   - All chart builders tested in _preflight() before Dash starts.
-  - ChromaDB access only via SignalDB. Never call chroma directly.
+  - Astra DB access only via SignalDB. Never call astrapy directly.
   - Styling via CSS className. Inline style only for dynamic values.
 
 Sponsor requirements implemented:
@@ -580,7 +580,7 @@ def _tab_overview() -> html.Div:
         html.Div("KEY METRICS", className="section-label"),
         dbc.Row([
             dbc.Col(_metric("Total Signals",   str(total) if total else "—",
-                            "in ChromaDB", "cyan"), md=3),
+                            "in Astra DB", "cyan"), md=3),
             dbc.Col(_metric("Critical",        str(stats["critical"]) if total else "—",
                             "score ≥ 0.75", "red"), md=3),
             dbc.Col(_metric("High",            str(stats["high"]) if total else "—",
@@ -683,7 +683,7 @@ def _tab_feed() -> html.Div:
         dbc.Row([
             dbc.Col([
                 html.Div(
-                    f"{len(signals)} signal(s) · sorted newest first · live from ChromaDB",
+                    f"{len(signals)} signal(s) · sorted newest first · live from Astra DB",
                     style={"fontSize": "11px", "color": "#3d4f62", "marginBottom": "16px"},
                 ),
                 html.Div(
@@ -725,7 +725,7 @@ def _tab_chatbot(history: list[dict] | None = None) -> html.Div:
 
     welcome = _chat_bubble(
         f"Fendt Intelligence Assistant\n\n"
-        f"{db_count} signal(s) indexed in ChromaDB. HuggingFace: {hf_status}\n\n"
+        f"{db_count} signal(s) indexed in Astra DB. HuggingFace: {hf_status}\n\n"
         f"Ask about macro-level strategic decisions, regulatory timelines, "
         f"competitive positioning, or supply chain risks across the EU agricultural market.",
         role="assistant",
@@ -1183,7 +1183,7 @@ def _run_lens_search(topic: str | None, custom: str | None = None) -> html.Div:
         if total_signals == 0:
             return html.Div([
                 html.Div("○", className="empty-state-icon"),
-                html.Div("No signals in ChromaDB", className="empty-state-title"),
+                html.Div("No signals in Astra DB", className="empty-state-title"),
                 html.Div(
                     'Click "Run Scout Now" in the sidebar to ingest intelligence. '
                     "The Intelligence Lens will populate after the first scout cycle completes.",
@@ -1214,7 +1214,7 @@ def _run_lens_search(topic: str | None, custom: str | None = None) -> html.Div:
 
 
 def _tab_lens() -> html.Div:
-    """Strategic Intelligence Lens — semantic deep-dive via ChromaDB search."""
+    """Strategic Intelligence Lens — semantic deep-dive via Astra DB."""
     initial_results = _run_lens_search(_LENS_PRESETS[0])
 
     return html.Div([
@@ -1245,7 +1245,7 @@ def _tab_lens() -> html.Div:
             dbc.Col(html.Div([
                 html.Div("HOW IT WORKS", className="section-label"),
                 html.P(
-                    "ChromaDB semantic search surfaces the most relevant signals for any "
+                    "Astra DB semantic search surfaces the most relevant signals for any "
                     "macro-trend query. Results are ranked by cosine similarity using the "
                     "all-MiniLM-L6-v2 embedding model.",
                     style={"fontSize": "10.5px", "color": "#c4d0dc", "lineHeight": "1.7"},
@@ -1307,7 +1307,7 @@ def _llm_chat(question: str, context_signals: list[Signal]) -> str:
             f"  Content: {s.content}\n"
             f"  Source: {s.source_url}"
             for i, s in enumerate(context_signals, 1)
-        ) if context_signals else "No matching signals found in ChromaDB."
+        ) if context_signals else "No matching signals found in Astra DB."
     )
     try:
         from huggingface_hub import InferenceClient
@@ -1551,7 +1551,7 @@ def update_sidebar(_i: int, _n: int):
 
         html.Div([
             html.Div("SERVICES", className="sb-section-label"),
-            _dot("ChromaDB",   db_kind),
+            _dot("Astra DB",  db_kind),
             _dot("HuggingFace API", gem_kind),
             _dot("Scheduler",  sched_kind),
             _dot("Scout",      scout_kind),
@@ -1783,11 +1783,11 @@ if __name__ == "__main__":
 
     _scheduler_engine.start()
     stats = _db_stats()
-    log.info("App starting — ChromaDB: %d signals, HuggingFace: %s",
+    log.info("App starting — Astra DB: %d signals, HuggingFace: %s",
              stats["total"], "OK" if _HF_OK else "NO KEY")
 
     print(f"\n  Fendt Sentinel  ·  http://localhost:8050")
-    print(f"  ChromaDB : {stats['total']} signal(s)")
+    print(f"  Astra DB : {stats['total']} signal(s)")
     print(f"  HuggingFace: {'OK' if _HF_OK else 'no API key — set HUGGINGFACEHUB_API_TOKEN'}")
     print(f"  Scheduler: active (6-hour scout cycle)")
     print(f"  Auto-refresh: 30 seconds\n")
