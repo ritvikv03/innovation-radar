@@ -151,8 +151,19 @@ _USER_TEMPLATE = textwrap.dedent("""\
 
 # ─── LLM call ─────────────────────────────────────────────────────────────────
 
+_MIN_INPUT_CHARS = 200   # skip sources with too little text to score meaningfully
+
+
 def _extract_json(raw: str) -> str:
-    """Strip any accidental markdown fences and extract first JSON object."""
+    """
+    Strip markdown fences, sanitise control characters, and extract the
+    first JSON object from the LLM response.
+
+    Handles two common model misbehaviours:
+    1. Prose instead of JSON   → raises ValueError (No JSON object found)
+    2. Raw control chars in    → replaced with spaces before parsing
+       JSON string values        (fixes 'Invalid control character' errors)
+    """
     # Remove ```json ... ``` or ``` ... ``` wrappers
     clean = re.sub(r"```(?:json)?", "", raw).strip()
     # Find the outermost { ... }
@@ -160,7 +171,11 @@ def _extract_json(raw: str) -> str:
     end   = clean.rfind("}")
     if start == -1 or end == -1:
         raise ValueError(f"No JSON object found in LLM response:\n{raw[:400]}")
-    return clean[start : end + 1]
+    candidate = clean[start : end + 1]
+    # Replace unescaped control characters (tabs, newlines inside strings)
+    # that cause json.JSONDecodeError: Invalid control character
+    candidate = re.sub(r'(?<!\\)[\x00-\x1f\x7f]', " ", candidate)
+    return candidate
 
 
 _DEDUP_THRESHOLD = 0.08   # cosine distance; lower = more similar. Tune here.
@@ -203,6 +218,12 @@ def _call_llm(text: str, max_input_chars: int = 8_000) -> LLMScoreResponse:
         raise RuntimeError(
             "HUGGINGFACEHUB_API_TOKEN is not set. "
             "Add it to your .env file."
+        )
+
+    if len(text.strip()) < _MIN_INPUT_CHARS:
+        raise ValueError(
+            f"Input too short to score meaningfully ({len(text)} chars < {_MIN_INPUT_CHARS}). "
+            "Skipping — scraper likely returned near-empty content."
         )
 
     truncated = text[:max_input_chars]
