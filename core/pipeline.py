@@ -38,7 +38,8 @@ log = get_logger(__name__)
 # `text-generation` endpoint that novita does not expose for this model.
 
 _HF_TOKEN       = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
-_HF_REPO_ID     = "meta-llama/Llama-3.2-3B-Instruct"
+_HF_REPO_ID     = "meta-llama/Llama-3.1-8B-Instruct"
+_HF_PROVIDER    = "cerebras"
 _MAX_NEW_TOKENS = 1024
 
 
@@ -240,7 +241,7 @@ def _call_llm(text: str, max_input_chars: int = 8_000) -> LLMScoreResponse:
 
     def _invoke() -> str:
         from huggingface_hub import InferenceClient  # local import — avoids circular deps
-        client   = InferenceClient(api_key=_HF_TOKEN)
+        client   = InferenceClient(api_key=_HF_TOKEN, provider=_HF_PROVIDER)
         response = client.chat_completion(
             model=_HF_REPO_ID,
             messages=messages,

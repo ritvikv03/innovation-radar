@@ -151,9 +151,9 @@ class SummaryEngine:
             from huggingface_hub import InferenceClient
 
             prompt = prompt_template.format_map(context_data)
-            client = InferenceClient(api_key=hf_token)
+            client = InferenceClient(api_key=hf_token, provider="cerebras")
             response = client.chat_completion(
-                model="meta-llama/Llama-3.2-3B-Instruct",
+                model="meta-llama/Llama-3.1-8B-Instruct",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=0.3,
@@ -291,9 +291,9 @@ def generate_brief_markdown(signals: List[Any]) -> str:
             f"Top signals by disruption score:\n{digest}\n\n"
             "Write the full strategic intelligence brief now."
         )
-        client = InferenceClient(api_key=hf_token)
+        client = InferenceClient(api_key=hf_token, provider="cerebras")
         response = client.chat_completion(
-            model="meta-llama/Llama-3.2-3B-Instruct",
+            model="meta-llama/Llama-3.1-8B-Instruct",
             messages=[
                 {"role": "system", "content": _BRIEF_SYSTEM},
                 {"role": "user",   "content": user_prompt},

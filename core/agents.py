@@ -51,8 +51,9 @@ from core.logger import get_logger
 
 log = get_logger(__name__)
 
-_HF_TOKEN   = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
-_HF_MODEL   = "meta-llama/Llama-3.2-3B-Instruct"
+_HF_TOKEN    = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
+_HF_MODEL    = "meta-llama/Llama-3.1-8B-Instruct"
+_HF_PROVIDER = "cerebras"
 
 
 # ── Utility: dict_to_string ───────────────────────────────────────────────────
@@ -134,7 +135,7 @@ def _hf_chat(
     if not _HF_TOKEN:
         raise RuntimeError("HUGGINGFACEHUB_API_TOKEN not set")
     from huggingface_hub import InferenceClient
-    client   = InferenceClient(api_key=_HF_TOKEN)
+    client   = InferenceClient(api_key=_HF_TOKEN, provider=_HF_PROVIDER)
     response = client.chat_completion(
         model=_HF_MODEL,
         messages=messages,
