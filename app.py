@@ -72,7 +72,7 @@ from core.scheduler      import HEALTH, engine as _scheduler_engine
 from core.logger         import get_logger
 from core.summary_engine import generate_brief_markdown
 from core.agents         import run_agent_query
-from core.graph_engine   import get_causal_chains
+from core.graph_engine   import get_causal_chains, rebuild_graph_from_db, infer_hidden_relationships
 
 log = get_logger(__name__)
 
@@ -880,20 +880,85 @@ def _render_causal_chains() -> list:
     return items
 
 
+def _render_inferred_relationships() -> list:
+    """Build sidebar widgets for inferred cross-PESTEL cascade relationships."""
+    if not _GRAPH_JSON.exists():
+        return []
+    try:
+        graph   = json.loads(_GRAPH_JSON.read_text())
+        inferred = [
+            t for t in graph.get("triples", [])
+            if t.get("metadata", {}).get("inferred")
+        ]
+    except Exception:
+        return []
+
+    if not inferred:
+        return [html.Div(
+            "No inferred cascades yet — click 'Run Inference' to surface hidden cross-PESTEL relationships.",
+            style={"fontSize": "9px", "color": "#3d4f62", "lineHeight": "1.6"},
+        )]
+
+    items = []
+    for t in inferred[:5]:
+        chain   = t.get("metadata", {}).get("causal_chain", [])
+        hops    = t.get("metadata", {}).get("hop_count", 0)
+        subj    = t.get("subject", {}).get("label", "?")
+        obj     = t.get("object", {}).get("label", "?")
+        arrow   = " → ".join(
+            f'<span style="color:{_CAT_COLOUR.get(p, "#7d8fa8")}">{p[:3]}</span>'
+            for p in chain
+        )
+        items.append(html.Div([
+            html.Div(
+                f"{hops}-hop cascade",
+                style={"fontSize": "9px", "color": "#00e5ff",
+                       "fontFamily": "JetBrains Mono, monospace"},
+            ),
+            html.Div(
+                dangerously_allow_html=True,
+                children=arrow,
+                style={"fontSize": "10px", "marginTop": "2px"},
+            ),
+            html.Div(
+                f"{subj[:28]} → {obj[:28]}",
+                style={"fontSize": "9px", "color": "#7d8fa8", "marginTop": "2px"},
+            ),
+        ], style={"marginBottom": "8px", "paddingLeft": "4px",
+                  "borderLeft": "2px solid rgba(0,229,255,0.15)"}))
+    return items
+
+
 def _tab_graph() -> html.Div:
     """Knowledge Graph — causal interdependency visualisation."""
     elements   = _load_graph_elements_cached()
     node_count = sum(1 for e in elements if "source" not in e.get("data", {}))
     edge_count = len(elements) - node_count
 
+    # Shared control buttons (always present)
+    graph_controls = html.Div([
+        dbc.Button(
+            "Rebuild Graph", id="rebuild-graph-btn",
+            color="warning", size="sm", outline=True,
+            style={"marginRight": "8px", "fontSize": "10px"},
+        ),
+        dbc.Button(
+            "Run Inference", id="run-inference-btn",
+            color="info", size="sm", outline=True,
+            style={"fontSize": "10px"},
+        ),
+        html.Div(id="graph-action-status",
+                 style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "6px"}),
+    ], style={"marginBottom": "12px"})
+
     if node_count == 0:
         empty = html.Div([
             html.Div("○", className="empty-state-icon"),
             html.Div("No graph data yet", className="empty-state-title"),
             html.Div(
-                "Run the Scout to ingest signals. The Knowledge Graph populates automatically "
-                "as relationships are detected between PESTEL signals. Check back after the "
-                "next scout cycle.",
+                "Run the Scout to ingest signals. The Knowledge Graph builds automatically "
+                "after each cycle — only nodes derived from live Astra DB signals appear here. "
+                "Use 'Rebuild Graph' to reconstruct from the current DB state.",
                 className="empty-state-body",
             ),
         ], className="empty-state")
@@ -904,6 +969,7 @@ def _tab_graph() -> html.Div:
                                         "alignItems": "center", "justifyContent": "center"}),
                         md=9),
                 dbc.Col(html.Div([
+                    graph_controls,
                     html.Div("GRAPH INFO", className="section-label"),
                     _metric("Nodes", "—"), html.Div(style={"height": "8px"}),
                     _metric("Edges", "—"),
@@ -939,10 +1005,14 @@ def _tab_graph() -> html.Div:
                 className="chart-card",
             ), md=9),
             dbc.Col(html.Div([
+                graph_controls,
                 html.Div("GRAPH INFO", className="section-label"),
                 _metric("Nodes", str(node_count)),
                 html.Div(style={"height": "8px"}),
                 _metric("Edges", str(edge_count)),
+                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
+                html.Div("INFERRED CASCADES", className="section-label"),
+                *_render_inferred_relationships(),
                 html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
                 html.Div("CAUSAL CHAINS", className="section-label"),
                 *_render_causal_chains(),
@@ -1692,6 +1762,39 @@ def trigger_scout(n: int) -> str:
 
 
 @app.callback(
+    Output("graph-action-status", "children"),
+    Input("rebuild-graph-btn",   "n_clicks"),
+    Input("run-inference-btn",   "n_clicks"),
+    prevent_initial_call=True,
+)
+def graph_action(rebuild_n: int, infer_n: int) -> str:
+    """Handle Rebuild Graph and Run Inference buttons."""
+    triggered = callback_context.triggered_id
+    if triggered == "rebuild-graph-btn":
+        try:
+            counts = rebuild_graph_from_db()
+            _flask_cache.delete_memoized(_load_graph_elements_cached)
+            return (
+                f"Graph rebuilt: {counts['nodes']} nodes, "
+                f"{counts['links']} edges, {counts['triples']} triples"
+            )
+        except Exception as exc:
+            log.error("graph_action rebuild failed: %s", exc)
+            return f"Rebuild failed: {exc}"
+    elif triggered == "run-inference-btn":
+        try:
+            result = infer_hidden_relationships()
+            _flask_cache.delete_memoized(_load_graph_elements_cached)
+            added = result["inferred_added"]
+            total = result["total_triples"]
+            return f"Inference complete: +{added} hidden cascades ({total} total triples)"
+        except Exception as exc:
+            log.error("graph_action inference failed: %s", exc)
+            return f"Inference failed: {exc}"
+    return no_update
+
+
+@app.callback(
     Output("export-download", "data"),
     Input("export-btn", "n_clicks"),
     prevent_initial_call=True,
@@ -1738,7 +1841,6 @@ def export_report_pdf(_n: int, path: str | None):
     output=[
         Output("reports-dropdown",   "options"),
         Output("reports-dropdown",   "value"),
-        Output("reports-body",       "children"),
         Output("reports-gen-status", "children"),
     ],
     inputs=[Input("reports-gen-btn", "n_clicks")],
@@ -1754,39 +1856,37 @@ def export_report_pdf(_n: int, path: str | None):
     prevent_initial_call=True,
 )
 def generate_intelligence_brief(n_clicks: int):
-    """Fetch top 10 signals, call generate_brief_markdown, write .md, refresh dropdown."""
+    """Fetch top 10 signals, call generate_brief_markdown, write .md, refresh dropdown.
+
+    Setting reports-dropdown.value triggers render_report automatically —
+    no need to also output reports-body.children (that would be a duplicate output).
+    """
     try:
         db = SignalDB()
         total = db.count()
         if total == 0:
-            return no_update, no_update, no_update, "No signals in database — run Scout first."
+            return no_update, no_update, "No signals in database — run Scout first."
 
-        # Retrieve top 10 by disruption score
         results = db.search("agricultural market disruption EU Fendt", n_results=min(10, total))
-        signals = [sig for sig, _ in results]
-
-        # Sort descending by disruption score
-        signals.sort(key=lambda s: s.disruption_score, reverse=True)
+        signals = sorted([sig for sig, _ in results],
+                         key=lambda s: s.disruption_score, reverse=True)
 
         md_text = generate_brief_markdown(signals)
 
-        # Write to outputs/reports/
         _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-        ts_str  = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        ts_str   = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         out_path = _REPORTS_DIR / f"Strategic_Brief_{ts_str}.md"
         out_path.write_text(md_text, encoding="utf-8")
         log.info("Generated brief: %s", out_path.name)
 
-        # Refresh dropdown
         new_options = _glob_reports()
         new_value   = str(out_path)
-        new_body    = _render_report_body(new_value)
         status_msg  = f"✓ Brief generated: {out_path.name}"
-        return new_options, new_value, new_body, status_msg
+        return new_options, new_value, status_msg
 
     except Exception as exc:
         log.error("generate_intelligence_brief failed: %s", exc)
-        return no_update, no_update, no_update, f"Error: {exc}"
+        return no_update, no_update, f"Error: {exc}"
 
 
 # ── Intelligence Lens callback ────────────────────────────────
