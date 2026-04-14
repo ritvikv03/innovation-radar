@@ -201,7 +201,7 @@ def _chart_velocity(signals: list[Signal]) -> go.Figure:
     fig.update_layout(
         **_CHART_BASE,
         title=dict(text=f"Signal Ingest · Last 30 Days  ({len(signals)} total)",
-                   font_size=11, x=0.01, y=0.96, font_color="#3d4f62"),
+                   font_size=11, x=0.5, xanchor="center", y=0.96, font_color="#c4d2de"),
         xaxis=dict(title="", **_AXIS_X,
                    tickvals=[0, 9, 19, 29], ticktext=["30d ago", "20d ago", "10d ago", "Today"]),
         yaxis=dict(title="Signals", **_AXIS_Y),
@@ -230,7 +230,7 @@ def _chart_pestel_bar(signals: list[Signal]) -> go.Figure:
     ))
     fig.update_layout(
         **_CHART_BASE,
-        title=dict(text="Avg Disruption by Dimension", font_size=11, x=0.01, y=0.96, font_color="#3d4f62"),
+        title=dict(text="Avg Disruption by Dimension", font_size=11, x=0.5, xanchor="center", y=0.96, font_color="#c4d2de"),
         xaxis=dict(range=[0, 1], title="", **_AXIS_X),
         yaxis=dict(**_AXIS_X),
         showlegend=False,
@@ -240,31 +240,53 @@ def _chart_pestel_bar(signals: list[Signal]) -> go.Figure:
 
 
 def _chart_histogram(signals: list[Signal]) -> go.Figure:
-    """Disruption score distribution."""
-    scores = [s.disruption_score for s in signals]
+    """Disruption score distribution — stacked bar by PESTEL dimension."""
+    # Score buckets: LOW <0.40, MODERATE 0.40–0.60, HIGH 0.60–0.75, CRITICAL ≥0.75
+    buckets = ["LOW\n<0.40", "MODERATE\n0.40–0.60", "HIGH\n0.60–0.75", "CRITICAL\n≥0.75"]
+
+    def _bucket(score: float) -> int:
+        if score < 0.40:  return 0
+        if score < 0.60:  return 1
+        if score < 0.75:  return 2
+        return 3
+
+    # Count per dimension per bucket
+    counts: dict[str, list[int]] = {d: [0, 0, 0, 0] for d in _DIM_COLOUR}
+    for s in signals:
+        counts[s.pestel_dimension.value][_bucket(s.disruption_score)] += 1
 
     fig = go.Figure()
-    if not scores:
-        fig.add_annotation(text="No signals yet — run the Scout pipeline.",
-                           x=0.5, y=0.5, xref="paper", yref="paper",
-                           showarrow=False, font=dict(size=12, color="#3d4f62"))
+
+    if not signals:
+        fig.add_annotation(
+            text="No signals yet — run the Scout pipeline.",
+            x=0.5, y=0.5, xref="paper", yref="paper",
+            showarrow=False, font=dict(size=12, color="#7d8fa8"),
+        )
     else:
-        fig.add_trace(go.Histogram(
-            x=scores, nbinsx=20,
-            marker=dict(color=scores, colorscale="Plasma",
-                        line=dict(color="rgba(0,0,0,0.3)", width=0.4)),
-            hovertemplate="Score: %{x:.2f} — Count: %{y}<extra></extra>",
-        ))
+        for dim, col in _DIM_COLOUR.items():
+            fig.add_trace(go.Bar(
+                name=dim,
+                x=buckets,
+                y=counts[dim],
+                marker_color=_hex_to_rgba(col, 0.82),
+                marker_line_width=0,
+                hovertemplate=f"{dim}: %{{y}} signals<extra></extra>",
+            ))
 
     fig.update_layout(
         **_CHART_BASE,
-        title=dict(text=f"Disruption Distribution · {len(scores)} signals",
-                   font_size=11, x=0.01, y=0.96, font_color="#3d4f62"),
-        xaxis=dict(title="Composite Score", range=[0, 1], **_AXIS_X),
-        yaxis=dict(title="Count", **_AXIS_Y),
-        bargap=0.06,
-        height=220,
-        showlegend=False,
+        barmode="stack",
+        title=dict(
+            text=f"Disruption Distribution · {len(signals)} signals",
+            font_size=11, x=0.5, xanchor="center", y=0.96, font_color="#c4d2de",
+        ),
+        xaxis=dict(title="", **_AXIS_X),
+        yaxis=dict(title="Signals", **_AXIS_Y),
+        bargap=0.22,
+        legend=dict(orientation="h", y=-0.22, font_size=9, bgcolor="rgba(0,0,0,0)",
+                    font_color="#c4d2de"),
+        height=240,
     )
     return fig
 
@@ -355,7 +377,7 @@ def _chart_radar(signals: list[Signal],
         **_CHART_BASE,
         title=dict(
             text=f"Innovation Radar · {len(filtered)} of {len(signals)} signals · score ≥ {min_score:.2f}",
-            font_size=11, x=0.01, y=0.97, font_color="#3d4f62",
+            font_size=11, x=0.5, xanchor="center", y=0.97, font_color="#c4d2de",
         ),
         xaxis=dict(title="Time to Impact (months)", range=[0, 38], **_AXIS_NONE),
         yaxis=dict(title="Disruption Score", range=[0, 1.10], **_AXIS_NONE),
@@ -534,7 +556,7 @@ def _urgency_matrix(signals: list[Signal]) -> html.Div:
             html.Div("URGENCY MATRIX — 12M CRITICAL", className="section-label"),
             html.Div(
                 "No critical signals (score ≥ 0.75). Run the Scout to ingest intelligence.",
-                style={"fontSize": "12px", "color": "#3d4f62"},
+                style={"fontSize": "12px", "color": "#7d8fa8"},
             ),
         ], className="mb-4")
 
@@ -596,7 +618,7 @@ def _tab_overview() -> html.Div:
                 html.Div("TOP SIGNALS — HIGH + CRITICAL", className="section-label"),
                 *([_feed_card(s) for s in top3] if top3 else [
                     html.P("No signals yet. Run the Scout.",
-                           style={"color": "#3d4f62", "fontSize": "12px"}),
+                           style={"color": "#7d8fa8", "fontSize": "12px"}),
                 ]),
             ], className="war-card"), md=6),
         ], className="g-3"),
@@ -652,7 +674,7 @@ def _tab_radar() -> html.Div:
                 ),
                 html.Div(
                     "Default shows HIGH + CRITICAL only (≥ 0.50)",
-                    style={"fontSize": "9.5px", "color": "#3d4f62", "marginTop": "8px"},
+                    style={"fontSize": "9.5px", "color": "#7d8fa8", "marginTop": "8px"},
                 ),
             ], className="war-card"), md=3),
         ], className="g-3"),
@@ -669,12 +691,12 @@ def _tab_feed() -> html.Div:
             dbc.Col([
                 html.Div(
                     f"{len(signals)} signal(s) · sorted newest first · live from Astra DB",
-                    style={"fontSize": "11px", "color": "#3d4f62", "marginBottom": "16px"},
+                    style={"fontSize": "11px", "color": "#7d8fa8", "marginBottom": "16px"},
                 ),
                 html.Div(
                     [_feed_card(s) for s in signals] if signals else [
                         html.P("No signals. Run the Scout to ingest data.",
-                               style={"color": "#3d4f62", "fontSize": "12px"}),
+                               style={"color": "#7d8fa8", "fontSize": "12px"}),
                     ],
                 ),
             ], md=8),
@@ -758,7 +780,7 @@ def _tab_chatbot(history: list[dict] | None = None) -> html.Div:
                          style={"fontFamily": "JetBrains Mono, monospace",
                                 "fontSize": "10px", "color": "#7d8fa8"}),
                 html.Div("Universal Strategic Analysis",
-                         style={"fontSize": "10px", "color": "#3d4f62", "marginTop": "4px"}),
+                         style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "4px"}),
             ], className="war-card"), md=4),
         ], className="g-3"),
     ])
@@ -857,7 +879,7 @@ def _render_causal_chains() -> list:
     if not chains:
         return [html.Div(
             "No cascade chains yet — chains build as signals relate to each other.",
-            style={"fontSize": "9px", "color": "#3d4f62", "lineHeight": "1.6"},
+            style={"fontSize": "9px", "color": "#7d8fa8", "lineHeight": "1.6"},
         )]
     items = []
     for c in chains:
@@ -896,7 +918,7 @@ def _render_inferred_relationships() -> list:
     if not inferred:
         return [html.Div(
             "No inferred cascades yet — click 'Run Inference' to surface hidden cross-PESTEL relationships.",
-            style={"fontSize": "9px", "color": "#3d4f62", "lineHeight": "1.6"},
+            style={"fontSize": "9px", "color": "#7d8fa8", "lineHeight": "1.6"},
         )]
 
     items = []
@@ -975,7 +997,7 @@ def _tab_graph() -> html.Div:
                     _metric("Edges", "—"),
                     html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
                     html.Div("Run the Scout to generate graph data.",
-                             style={"fontSize": "10px", "color": "#3d4f62", "lineHeight": "1.6"}),
+                             style={"fontSize": "10px", "color": "#7d8fa8", "lineHeight": "1.6"}),
                 ], className="war-card"), md=3),
             ], className="g-3"),
         ])
@@ -1088,10 +1110,10 @@ def _render_report_body(path: str | None) -> html.Div:
                 html.Div(doc_class, className="report-classification"),
                 html.Div(doc_title, className="report-title"),
                 html.Div([
-                    html.Span("Generated: ", style={"color": "#3d4f62"}),
+                    html.Span("Generated: ", style={"color": "#7d8fa8"}),
                     html.Span(doc_date or "—", style={"color": "#7d8fa8"}),
                     html.Span("  ·  Source: Fendt PESTEL-EL Sentinel",
-                              style={"color": "#3d4f62"}),
+                              style={"color": "#7d8fa8"}),
                 ], className="report-meta"),
             ], className="report-doc-header-left"),
         ], className="report-doc-header"),
@@ -1195,7 +1217,7 @@ def _tab_reports() -> html.Div:
                 html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
                 html.Div(
                     "Place .md files in outputs/reports/ to register them here.",
-                    style={"fontSize": "9px", "color": "#3d4f62", "lineHeight": "1.6"},
+                    style={"fontSize": "9px", "color": "#7d8fa8", "lineHeight": "1.6"},
                 ),
             ], className="war-card"), md=2),
         ], className="g-3"),
