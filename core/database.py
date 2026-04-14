@@ -23,7 +23,8 @@ Similarity convention
 
 Environment
 -----------
-  ASTRA_DB_TOKEN — Application token from Astra DB console (required)
+  ASTRA_DB_TOKEN    — Application token from Astra DB console (required)
+  ASTRA_DB_ENDPOINT — Astra DB API endpoint URL (required)
 """
 
 from __future__ import annotations
@@ -46,7 +47,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
-_ASTRA_ENDPOINT  = "https://8debd070-7481-4ab4-bedd-3c06e680be00-us-east-2.apps.astra.datastax.com"
 _COLLECTION_NAME = "pestel_signals"
 
 # Astra Vectorize provider / model (no separate API key needed)
@@ -252,15 +252,22 @@ class SignalDB:
     """
 
     def __init__(self) -> None:
-        token = os.getenv("ASTRA_DB_TOKEN", "")
+        token    = os.getenv("ASTRA_DB_TOKEN", "")
+        endpoint = os.getenv("ASTRA_DB_ENDPOINT", "")
+
         if not token:
             raise RuntimeError(
                 "ASTRA_DB_TOKEN is not set. "
                 "Add it to your .env file and restart the app."
             )
+        if not endpoint:
+            raise RuntimeError(
+                "ASTRA_DB_ENDPOINT is not set. "
+                "Add it to your .env file and restart the app."
+            )
 
         client    = DataAPIClient(token=token)
-        self._db  = client.get_database(_ASTRA_ENDPOINT)
+        self._db  = client.get_database(endpoint)
         self._col = self._get_or_create_collection()
 
     # ── collection bootstrap ───────────────────────────────────────────────────
@@ -289,9 +296,6 @@ class SignalDB:
     def insert(self, signal: Signal) -> str:
         """
         Upsert a Signal by its UUID.
-
-        Astra Vectorize auto-embeds the ``$vectorize`` field using
-        Nvidia NV-Embed-QA. No local embedding computation occurs.
 
         Returns the signal id.
         """
@@ -339,8 +343,7 @@ class SignalDB:
         Returns
         -------
         List of (Signal, distance) tuples, sorted by distance ascending
-        (lower = more similar).  Distance = 1.0 − Astra similarity score,
-        preserving the ChromaDB convention used throughout the codebase.
+        (lower = more similar).  Distance = 1.0 − Astra similarity score.
         """
         filter_: dict = {}
         if dimension_filter:
@@ -397,11 +400,12 @@ class SignalDB:
         by_dim: dict[str, int] = {}
         for s in all_signals:
             by_dim[s.pestel_dimension.value] = by_dim.get(s.pestel_dimension.value, 0) + 1
+        endpoint = os.getenv("ASTRA_DB_ENDPOINT", "")
         return {
             "total_signals": self.count(),
             "by_dimension":  by_dim,
             "collection":    _COLLECTION_NAME,
-            "endpoint":      _ASTRA_ENDPOINT,
+            "endpoint":      endpoint,
             "vectorize":     f"{_VECTORIZE_PROVIDER}/{_VECTORIZE_MODEL}",
         }
 

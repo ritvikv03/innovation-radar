@@ -41,6 +41,12 @@ python app.py
 
 # 4. Or run a single pipeline pass (score + persist one article)
 python run_pipeline.py
+
+# 5. Dry-run (score without saving to Astra DB)
+python run_pipeline.py --no-save
+
+# 6. Score a specific URL
+python run_pipeline.py --url https://example.com/article
 ```
 
 ---
@@ -61,13 +67,12 @@ python run_pipeline.py
 
 | Tab | Purpose |
 |-----|---------|
+| Overview | KPI tiles, urgency matrix, velocity chart, disruption distribution |
 | Field Intelligence | Live signal feed with PESTEL filter and semantic search |
 | Radar | Plotly radar chart of disruption scores by dimension |
-| Timeline | Signals plotted over time by ingestion date |
-| Knowledge Graph | Interactive vis.js graph of SPO triples and causal chains |
+| Knowledge Graph | Interactive Cytoscape graph of SPO triples and causal chains |
 | Inquisition | LangGraph multi-agent chat for quantitative + synthesis queries |
 | Intelligence Brief | Auto-generated BLUF executive summary with source citations |
-| System Health | Scheduler status, error counts, last-run timestamp |
 
 ---
 
@@ -82,6 +87,8 @@ PESTEL_SOURCES (core/sources.py)
 ```
 
 All external HTTP calls use `retry_with_backoff` from `core/utils.py`.
+
+Near-duplicate signals are automatically detected via cosine distance (threshold 0.08) before LLM scoring — saving API quota and preventing redundant entries.
 
 ---
 
@@ -105,7 +112,38 @@ Astra DB integration tests skip automatically when `ASTRA_DB_TOKEN` is not set.
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `HUGGINGFACEHUB_API_TOKEN` | Yes | LLM scoring, summaries, agent chat |
-| `ASTRA_DB_TOKEN` | Yes | Astra DB vector store |
-| `ASTRA_DB_ENDPOINT` | Yes | Astra DB API endpoint |
+| `ASTRA_DB_TOKEN` | Yes | Astra DB application token |
+| `ASTRA_DB_ENDPOINT` | Yes | Astra DB API endpoint URL |
 | `FIRECRAWL_API_KEY` | Optional | HTML page scraping (falls back to `requests`) |
 | `LOG_LEVEL` | Optional | Console verbosity: `DEBUG`/`INFO`/`WARNING`/`ERROR` |
+
+---
+
+## GitHub Actions — Required Secrets
+
+For the automated daily sweep (`sentinel.yml`) to work, add these three secrets in **Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
+|--------|-------|
+| `HUGGINGFACEHUB_API_TOKEN` | Your HuggingFace token |
+| `ASTRA_DB_TOKEN` | Your Astra DB application token |
+| `ASTRA_DB_ENDPOINT` | Your Astra DB API endpoint URL |
+
+The workflow runs daily at midnight UTC and can also be triggered manually via **Actions → Sentinel — Daily Intelligence Sweep → Run workflow**.
+
+---
+
+## Adding Intelligence Sources
+
+All sources are defined in `core/sources.py`. To add a new source, append an entry to `PESTEL_SOURCES`:
+
+```python
+{
+    "url":         "https://example.com/feed.rss",
+    "dimension":   "ECONOMIC",          # one of the 6 PESTEL values
+    "source_name": "Example Feed",
+    "scrape_mode": "rss",               # "rss", "page", or "api_ec_press"
+}
+```
+
+The Scout will pick it up automatically on the next 6-hour cycle.
