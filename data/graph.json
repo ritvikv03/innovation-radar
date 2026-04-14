@@ -1,1 +1,7 @@
-{"directed": true, "nodes": [], "links": []}
+{
+  "directed": true,
+  "nodes": [],
+  "links": [],
+  "triples": [],
+  "schema_version": 2
+}

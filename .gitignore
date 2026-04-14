@@ -23,6 +23,7 @@ ENV/
 data/chroma_db/
 data/summaries.db
 data/sentinel_state.json
+data/.dash_cache/
 raw_ingest/*.json
 output/
 outputs/

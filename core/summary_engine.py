@@ -22,11 +22,13 @@ Usage (from any module)::
     cached = engine.get_latest()
 """
 
+from __future__ import annotations
+
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 class SummaryEngine:
@@ -138,7 +140,7 @@ class SummaryEngine:
         context_data: Dict[str, Any],
         max_tokens: int,
     ) -> Optional[str]:
-        """Try the HuggingFace Inference API via LangChain. Returns text or None on failure."""
+        """Try HuggingFace InferenceClient chat_completion. Returns text or None on failure."""
         if self._quota_hit:
             return None
         hf_token = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
@@ -146,22 +148,18 @@ class SummaryEngine:
             return None
 
         try:
-            from langchain_huggingface import HuggingFaceEndpoint
+            from huggingface_hub import InferenceClient
 
             prompt = prompt_template.format_map(context_data)
-            llm = HuggingFaceEndpoint(
-                repo_id="mistralai/Mistral-7B-Instruct-v0.3",
-                huggingfacehub_api_token=hf_token,
-                max_new_tokens=max_tokens,
+            client = InferenceClient(api_key=hf_token, provider="cerebras")
+            response = client.chat_completion(
+                model="meta-llama/Llama-3.1-8B-Instruct",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
                 temperature=0.3,
-                timeout=60,
             )
-            result = llm.invoke(prompt)
-            if hasattr(result, "content"):
-                result = result.content
-            if isinstance(result, list):
-                result = " ".join(str(part) for part in result)
-            return str(result).strip() or None
+            result = response.choices[0].message.content.strip()
+            return result or None
         except Exception as exc:
             err = str(exc)
             if "429" in err or "quota" in err.lower() or "rate" in err.lower():
@@ -235,3 +233,121 @@ class SummaryEngine:
                 conn.close()
 
         return _ctx()
+
+
+# ── Module-level helper ───────────────────────────────────────────────────────
+
+_BRIEF_SYSTEM = (
+    "You are a senior strategic intelligence analyst for Fendt (AGCO). "
+    "Write a concise, actionable executive intelligence brief in Markdown. "
+    "Structure: ## Executive Summary, ## Critical Signals (bullet list), "
+    "## Strategic Implications, ## Recommended Actions. "
+    "Be direct, concrete, and board-ready. No fluff."
+)
+
+
+def generate_brief_markdown(signals: List[Any]) -> str:
+    """
+    Generate a full strategic intelligence brief in Markdown format.
+
+    Parameters
+    ----------
+    signals:
+        List of Signal objects (or dicts with title/content/pestel_dimension/
+        disruption_score keys). Typically the top 10 by disruption score.
+
+    Returns
+    -------
+    Markdown string.  Falls back to a rule-based brief if the LLM is unavailable.
+    """
+    hf_token = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
+
+    # Build signal digest regardless of LLM availability
+    lines: List[str] = []
+    for s in signals:
+        if hasattr(s, "title"):
+            title   = s.title
+            content = s.content
+            dim     = s.pestel_dimension.value if hasattr(s.pestel_dimension, "value") else str(s.pestel_dimension)
+            score   = getattr(s, "disruption_score", 0.0)
+        else:
+            title   = s.get("title", "Untitled")
+            content = s.get("content", "")
+            dim     = s.get("pestel_dimension", "UNKNOWN")
+            score   = s.get("disruption_score", 0.0)
+        lines.append(f"[{dim} | score={score:.2f}] {title}: {content[:200]}")
+
+    digest = "\n".join(lines)
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    if not hf_token:
+        return _rule_based_brief(signals, digest, ts)
+
+    try:
+        from huggingface_hub import InferenceClient
+
+        user_prompt = (
+            f"Date: {ts}\n\n"
+            f"Top signals by disruption score:\n{digest}\n\n"
+            "Write the full strategic intelligence brief now."
+        )
+        client = InferenceClient(api_key=hf_token, provider="cerebras")
+        response = client.chat_completion(
+            model="meta-llama/Llama-3.1-8B-Instruct",
+            messages=[
+                {"role": "system", "content": _BRIEF_SYSTEM},
+                {"role": "user",   "content": user_prompt},
+            ],
+            max_tokens=1024,
+            temperature=0.4,
+        )
+        text = response.choices[0].message.content.strip()
+        return text if text else _rule_based_brief(signals, digest, ts)
+    except Exception:
+        return _rule_based_brief(signals, digest, ts)
+
+
+def _rule_based_brief(signals: List[Any], digest: str, ts: str) -> str:
+    """Deterministic fallback brief when the LLM is unavailable."""
+    count = len(signals)
+    dims: dict[str, int] = {}
+    for s in signals:
+        dim = (
+            s.pestel_dimension.value
+            if hasattr(s, "pestel_dimension") and hasattr(s.pestel_dimension, "value")
+            else str(getattr(s, "pestel_dimension", s.get("pestel_dimension", "UNKNOWN")))
+        )
+        dims[dim] = dims.get(dim, 0) + 1
+    dim_summary = ", ".join(f"{k}: {v}" for k, v in sorted(dims.items()))
+
+    bullets = []
+    for s in signals[:5]:
+        title = s.title if hasattr(s, "title") else s.get("title", "Untitled")
+        score = getattr(s, "disruption_score", s.get("disruption_score", 0.0)) if not hasattr(s, "disruption_score") else s.disruption_score
+        bullets.append(f"- **{title}** (disruption score: {score:.2f})")
+    bullet_str = "\n".join(bullets)
+
+    return f"""# Fendt Strategic Intelligence Brief
+**Classification:** INTERNAL — C-SUITE
+**Generated:** {ts}
+**Signal Count:** {count}
+
+---
+
+## Executive Summary
+This brief synthesises the {count} highest-disruption signals currently tracked across the EU agricultural machinery market. Dimension distribution: {dim_summary}.
+
+## Critical Signals
+{bullet_str}
+
+## Strategic Implications
+Review the full signal feed for detailed analysis. High-velocity signals in the TECHNOLOGICAL and REGULATORY dimensions warrant immediate attention from product and policy teams.
+
+## Recommended Actions
+1. Brief the board on the top 3 signals flagged above.
+2. Assign PESTEL owners to monitor velocity trends over the next 30 days.
+3. Schedule a competitive response session if any signal exceeds disruption score 0.85.
+
+---
+*Generated by Fendt PESTEL-EL Sentinel — rule-based fallback (LLM unavailable)*
+"""

@@ -9,7 +9,7 @@ Architecture
     → every 6 hours: _run_scout_cycle()
         → scrape each PESTEL_SOURCE
         → score each article via Gemini
-        → save to ChromaDB
+        → save to Astra DB
     → every 30 seconds: _heartbeat()
         → update HEALTH dict (alive, last_run, counts)
 
@@ -69,13 +69,13 @@ HEALTH: dict = {
 def _run_scout_cycle() -> None:
     """
     One full intelligence cycle:
-      scrape all sources → score via Gemini → save to ChromaDB.
+      scrape all sources → score via Gemini → save to Astra DB.
     Errors per source are caught; they never abort the full cycle.
     """
-    from core.scraper  import scrape_source
-    from core.pipeline import score_and_save
-    from core.database import SignalDB
-    from core.graph_engine import run_graph_update
+    from core.scraper      import scrape_source
+    from core.pipeline     import score_and_save
+    from core.database     import SignalDB
+    from core.graph_engine import run_graph_update, rebuild_graph_from_db
 
     HEALTH["scout_running"] = True
     cycle_start = datetime.now(timezone.utc)
@@ -138,6 +138,14 @@ def _run_scout_cycle() -> None:
 
     elapsed = (datetime.now(timezone.utc) - cycle_start).total_seconds()
     log.info("Scout cycle done: saved=%d errors=%d elapsed=%.1fs", saved, errors, elapsed)
+
+    # Rebuild the Knowledge Graph from the full current Astra DB state
+    # so every run produces an accurate, non-stale graph.
+    if saved > 0:
+        try:
+            rebuild_graph_from_db()
+        except Exception as exc:
+            log.error("Post-cycle graph rebuild failed: %s", exc)
 
 
 def _heartbeat() -> None:
