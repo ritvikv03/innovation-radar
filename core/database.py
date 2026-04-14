@@ -266,9 +266,18 @@ class SignalDB:
                 "Add it to your .env file and restart the app."
             )
 
-        client    = DataAPIClient(token=token)
-        self._db  = client.get_database(endpoint)
-        self._col = self._get_or_create_collection()
+        try:
+            client    = DataAPIClient(token=token)
+            self._db  = client.get_database(endpoint)
+            # This triggers a network call to verify the token/endpoint
+            self._col = self._get_or_create_collection()
+        except Exception as exc:
+            # Handle 401 Unauthorized and other connection errors gracefully
+            # so the dashboard can still start in "offline/no-data" mode.
+            from core.logger import get_logger
+            get_logger(__name__).error("Astra DB connection failed: %s", exc)
+            self._db  = None
+            self._col = None
 
     # ── collection bootstrap ───────────────────────────────────────────────────
 
@@ -299,6 +308,8 @@ class SignalDB:
 
         Returns the signal id.
         """
+        if self._col is None:
+            raise RuntimeError("Database not connected. Check ASTRA_DB_TOKEN.")
         doc = signal._to_astra_doc()
         self._col.find_one_and_replace(
             {"_id": signal.id},
@@ -328,6 +339,8 @@ class SignalDB:
         n_results: int = 5,
         dimension_filter: Optional[PESTELDimension] = None,
     ) -> list[tuple[Signal, float]]:
+        if self._col is None:
+            return []
         """
         Semantic similarity search powered by Astra Vectorize.
 
@@ -367,6 +380,8 @@ class SignalDB:
 
     def get_by_id(self, signal_id: str) -> Optional[Signal]:
         """Exact fetch by UUID."""
+        if self._col is None:
+            return None
         doc = self._col.find_one(
             {"_id": signal_id},
             projection={"$vector": False},
@@ -382,18 +397,28 @@ class SignalDB:
         For dashboard and export use. Signals are returned in arbitrary
         order; callers are responsible for sorting.
         """
-        cursor = self._col.find(
-            {},
-            projection={"$vector": False},
-            limit=2_000,
-        )
-        return [Signal._from_astra_doc(doc) for doc in cursor]
+        if self._col is None:
+            return []
+        try:
+            cursor = self._col.find(
+                {},
+                projection={"$vector": False},
+                limit=2_000,
+            )
+            return [Signal._from_astra_doc(doc) for doc in cursor]
+        except Exception:
+            return []
 
     # ── stats ──────────────────────────────────────────────────────────────────
 
     def count(self) -> int:
         """Fast estimated document count (no full scan)."""
-        return self._col.count_documents({}, upper_bound=10_000)
+        if self._col is None:
+            return 0
+        try:
+            return self._col.count_documents({}, upper_bound=10_000)
+        except Exception:
+            return 0
 
     def stats(self) -> dict:
         all_signals = self.get_all()

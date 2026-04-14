@@ -470,12 +470,15 @@ def _build_export_html() -> str:
 # ─────────────────────────────────────────────────────────────
 
 def _preflight() -> None:
-    signals = _get_all_signals_cached()
-    _chart_velocity(signals)
-    _chart_pestel_bar(signals)
-    _chart_histogram(signals)
-    _chart_radar(signals)
-    log.info("Pre-flight passed — all chart builders OK (%d signals)", len(signals))
+    try:
+        signals = _get_all_signals_cached()
+        _chart_velocity(signals)
+        _chart_pestel_bar(signals)
+        _chart_histogram(signals)
+        _chart_radar(signals)
+        log.info("Pre-flight passed — all chart builders OK (%d signals)", len(signals))
+    except Exception as exc:
+        log.warning("Pre-flight skipped or failed (likely DB connection): %s", exc)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -498,249 +501,142 @@ def _dot(label: str, kind: str = "idle") -> html.Div:
     ], className="sb-status")
 
 
-def _feed_card(s: Signal) -> html.Div:
-    """Signal feed row with verifiable source link (sponsor requirement #1)."""
-    score    = s.disruption_score
-    sev      = _sev(score)
-    sev_col  = _SEV_COLOUR[sev]
-    dim      = s.pestel_dimension.value
-    dim_code = _DIM_PILL_CODE.get(dim, "P")
-    ts       = s.date_ingested.strftime("%d %b %Y %H:%M UTC")
-
-    return html.Div([
-        html.Div([
-            html.Span(dim[:3], className=f"dim-pill dp-{dim_code}"),
-            html.Span(sev.upper(), className=f"sev-badge sev-{sev}"),
-            html.Span(f"{score:.3f}", className="feed-score"),
-        ], className="feed-header"),
-        html.Div(s.title, className="feed-title"),
-        html.Div([
-            html.Span(ts, className="feed-meta"),
-            html.A("↗ Verify Source", href=s.source_url, target="_blank",
-                   className="source-link", style={"marginLeft": "12px"}),
-        ]),
-    ], className="feed-row", style={"borderLeftColor": sev_col})
-
-
-def _chat_bubble(text: str, role: str = "assistant") -> html.Div:
-    cls = "bubble bubble-user" if role == "user" else "bubble bubble-assistant"
-    return html.Div(
-        html.Div(text, style={"whiteSpace": "pre-wrap"}),
-        className=cls,
-    )
-
-
 # ─────────────────────────────────────────────────────────────
-# Urgency Matrix — 12M CRITICAL signals (sponsor requirement #2)
-# ─────────────────────────────────────────────────────────────
-
-def _urgency_card(s: Signal) -> html.Div:
-    dim_code = _DIM_PILL_CODE.get(s.pestel_dimension.value, "P")
-    return html.Div([
-        html.Span(s.pestel_dimension.value[:3], className=f"dim-pill dp-{dim_code}"),
-        html.Div(f"{s.disruption_score:.3f}", className="urgency-score"),
-        html.Div(s.title, className="urgency-title"),
-        html.A("↗ Verify Source", href=s.source_url, target="_blank", className="source-link"),
-    ], className="urgency-card")
-
-
-def _urgency_matrix(signals: list[Signal]) -> html.Div:
-    critical = sorted(
-        [s for s in signals if s.disruption_score >= 0.75],
-        key=lambda s: s.disruption_score,
-        reverse=True,
-    )[:3]
-
-    if not critical:
-        return html.Div([
-            html.Div("URGENCY MATRIX — 12M CRITICAL", className="section-label"),
-            html.Div(
-                "No critical signals (score ≥ 0.75). Run the Scout to ingest intelligence.",
-                style={"fontSize": "12px", "color": "#7d8fa8"},
-            ),
-        ], className="mb-4")
-
-    return html.Div([
-        html.Div("URGENCY MATRIX — 12M CRITICAL SIGNALS", className="section-label"),
-        dbc.Row(
-            [dbc.Col(_urgency_card(s), md=4) for s in critical],
-            className="g-3",
-        ),
-    ], className="mb-4")
-
-
-# ─────────────────────────────────────────────────────────────
-# Tab Content Builders
+# Tab Components
 # ─────────────────────────────────────────────────────────────
 
 def _tab_overview() -> html.Div:
+    """Field Intelligence Overview — KPIs and high-level distribution."""
     signals = _get_all_signals_cached()
     stats   = _db_stats_cached()
-    total   = stats["total"]
-    top3    = sorted(signals, key=lambda s: s.disruption_score, reverse=True)[:3]
 
     return html.Div([
-        # ── Urgency Matrix (top, always first) ─────────────────
-        _urgency_matrix(signals),
-
-        # ── KPI Tiles ──────────────────────────────────────────
-        html.Div("KEY METRICS", className="section-label"),
+        # KPI Row
         dbc.Row([
-            dbc.Col(_metric("Total Signals",   str(total) if total else "—",
-                            "in Astra DB", "cyan"), md=3),
-            dbc.Col(_metric("Critical",        str(stats["critical"]) if total else "—",
-                            "score ≥ 0.75", "red"), md=3),
-            dbc.Col(_metric("High",            str(stats["high"]) if total else "—",
-                            "score 0.50–0.75", "amber"), md=3),
-            dbc.Col(_metric("Avg Disruption",  f'{stats["avg_disruption"]:.3f}' if total else "—",
-                            "I×0.5 + N×0.3 + V×0.2", "green" if total else ""), md=3),
-        ], className="g-3 mb-4"),
+            dbc.Col(_metric("Total Signals", str(stats["total"]), "Astra DB Vector Store"), md=3),
+            dbc.Col(_metric("Critical", str(stats["critical"]), "Score ≥ 0.75", "red"), md=3),
+            dbc.Col(_metric("High", str(stats["high"]), "Score 0.50–0.75", "amber"), md=3),
+            dbc.Col(_metric("Avg Disruption", f"{stats['avg_disruption']:.3f}", "Global Mean"), md=3),
+        ], className="g-3 mb-3"),
 
-        # ── Charts Row ──────────────────────────────────────────
+        # Charts Row
         dbc.Row([
-            dbc.Col(html.Div(
-                dcc.Graph(figure=_chart_velocity(signals), config={"displayModeBar": False}),
-                className="chart-card",
-            ), md=8),
-            dbc.Col(html.Div(
-                dcc.Graph(figure=_chart_pestel_bar(signals), config={"displayModeBar": False}),
-                className="chart-card",
-            ), md=4),
-        ], className="g-3 mb-4"),
+            dbc.Col(html.Div(dcc.Graph(figure=_chart_velocity(signals), id="chart-velocity",
+                                      config={"displayModeBar": False}),
+                             className="chart-card"), md=7),
+            dbc.Col(html.Div(dcc.Graph(figure=_chart_pestel_bar(signals), id="chart-pestel-bar",
+                                      config={"displayModeBar": False}),
+                             className="chart-card"), md=5),
+        ], className="g-3 mb-3"),
 
-        # ── Distribution + Top Signals ──────────────────────────
         dbc.Row([
-            dbc.Col(html.Div(
-                dcc.Graph(figure=_chart_histogram(signals), config={"displayModeBar": False}),
-                className="chart-card",
-            ), md=6),
-            dbc.Col(html.Div([
-                html.Div("TOP SIGNALS — HIGH + CRITICAL", className="section-label"),
-                *([_feed_card(s) for s in top3] if top3 else [
-                    html.P("No signals yet. Run the Scout.",
-                           style={"color": "#7d8fa8", "fontSize": "12px"}),
-                ]),
-            ], className="war-card"), md=6),
+            dbc.Col(html.Div(dcc.Graph(figure=_chart_histogram(signals), id="chart-histogram",
+                                      config={"displayModeBar": False}),
+                             className="chart-card"), md=12),
         ], className="g-3"),
     ])
 
 
 def _tab_radar() -> html.Div:
-    """Innovation Radar — default shows only HIGH+CRITICAL (score ≥ 0.50)."""
+    """Disruption Horizon — innovation radar view."""
     return html.Div([
         dbc.Row([
-            dbc.Col(html.Div(
-                dcc.Loading(
-                    dcc.Graph(id="radar-chart", config={"displayModeBar": False}),
-                    type="circle", color="#00e5ff",
-                ),
-                className="chart-card",
-            ), md=9),
             dbc.Col(html.Div([
-                # Ring guide
-                html.Div("RING GUIDE", className="section-label"),
-                *[html.Div([
-                    html.Div(style={"width": "10px", "height": "10px", "borderRadius": "50%",
-                                    "background": col, "flexShrink": "0",
-                                    "boxShadow": f"0 0 6px {col}"}),
-                    html.Span(f"{ring} — {lbl}", style={"fontSize": "11px", "color": "#7d8fa8"}),
-                ], style={"display": "flex", "alignItems": "center", "gap": "8px", "marginBottom": "7px"})
-                  for ring, lbl, col in [
-                      ("12M", "CRITICAL · Immediate",     "#ff1744"),
-                      ("24M", "HIGH · Plan Now",          "#ffab00"),
-                      ("36M", "MONITOR · Watch Horizon",  "#00e676"),
-                  ]],
+                html.Div("RADAR CONTROLS", className="section-label"),
+                html.Div([
+                    html.Label("Dimension Filter", style={"fontSize": "11px", "color": "#7d8fa8"}),
+                    dcc.Dropdown(
+                        id="radar-dim-filter",
+                        options=[{"label": "All Dimensions", "value": "All"}] +
+                                [{"label": d, "value": d} for d in _DIM_COLOUR],
+                        value="All",
+                        clearable=False,
+                        style={"marginBottom": "16px"},
+                    ),
+                    html.Label("Min Disruption Score", style={"fontSize": "11px", "color": "#7d8fa8"}),
+                    dcc.Slider(
+                        id="radar-score-slider",
+                        min=0.0, max=0.90, step=0.05, value=0.50,
+                        marks={0: "0.0", 0.5: "0.5", 0.75: "0.75", 0.9: "0.9"},
+                        className="mt-2",
+                    ),
+                ], className="war-card", style={"padding": "16px"}),
+            ], className="h-100"), md=3),
 
-                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "16px 0"}),
-
-                # Filters
-                html.Div("FILTERS", className="section-label"),
-                html.Div("PESTEL Dimension", className="filter-label"),
-                dcc.Dropdown(
-                    id="radar-dim-filter",
-                    options=[{"label": d, "value": d} for d in
-                             ["All", "POLITICAL", "ECONOMIC", "SOCIAL",
-                              "TECHNOLOGICAL", "ENVIRONMENTAL", "LEGAL"]],
-                    value="All", clearable=False,
-                    style={"marginBottom": "14px"},
-                ),
-                html.Div("Min Disruption Score", className="filter-label"),
-                dcc.Slider(
-                    id="radar-score-slider",
-                    min=0, max=1, step=0.05,
-                    value=0.50,          # default: HIGH+CRITICAL only (sponsor req #4)
-                    marks={0: "0", 0.50: "0.50", 0.75: "0.75", 1: "1"},
-                    tooltip={"placement": "bottom"},
-                ),
-                html.Div(
-                    "Default shows HIGH + CRITICAL only (≥ 0.50)",
-                    style={"fontSize": "9.5px", "color": "#7d8fa8", "marginTop": "8px"},
-                ),
-            ], className="war-card"), md=3),
+            dbc.Col(html.Div([
+                dcc.Graph(id="radar-chart", config={"displayModeBar": False}),
+            ], className="chart-card"), md=9),
         ], className="g-3"),
     ])
 
 
 def _tab_feed() -> html.Div:
-    signals = sorted(_get_all_signals_cached(), key=lambda s: s.date_ingested, reverse=True)
-    stats   = _db_stats_cached()
-    by_dim  = stats.get("by_dim", {})
+    """Signal Feed — raw intelligence data table."""
+    signals = _get_all_signals_cached()
+    # Sort by date descending
+    signals = sorted(signals, key=lambda s: s.date_ingested, reverse=True)
+
+    def _row(s: Signal):
+        col = _DIM_COLOUR.get(s.pestel_dimension.value, "#9cb3c9")
+        return html.Tr([
+            html.Td(s.date_ingested.strftime("%Y-%m-%d")),
+            html.Td(html.Span(_DIM_PILL_CODE.get(s.pestel_dimension.value, "?"),
+                              className=f"dim-pill dim-{s.pestel_dimension.value.lower()}")),
+            html.Td(html.Div([
+                html.Div(s.title, style={"fontWeight": "600", "color": "#e8edf5"}),
+                html.Div(s.content[:140] + "...", style={"fontSize": "11px", "color": "#7d8fa8"}),
+            ])),
+            html.Td(f"{s.disruption_score:.3f}", style={"fontFamily": "JetBrains Mono",
+                                                       "color": _SEV_COLOUR.get(_sev(s.disruption_score))}),
+            html.Td(html.A("↗", href=s.source_url, target="_blank", className="source-link")),
+        ])
+
+    table = html.Table([
+        html.Thead(html.Tr([
+            html.Th("Date"), html.Th("Dim"), html.Th("Signal"), html.Th("Score"), html.Th("Src")
+        ])),
+        html.Tbody([_row(s) for s in signals[:100]]),
+    ], className="war-table")
 
     return html.Div([
-        dbc.Row([
-            dbc.Col([
-                html.Div(
-                    f"{len(signals)} signal(s) · sorted newest first · live from Astra DB",
-                    style={"fontSize": "11px", "color": "#7d8fa8", "marginBottom": "16px"},
-                ),
-                html.Div(
-                    [_feed_card(s) for s in signals] if signals else [
-                        html.P("No signals. Run the Scout to ingest data.",
-                               style={"color": "#7d8fa8", "fontSize": "12px"}),
-                    ],
-                ),
-            ], md=8),
-            dbc.Col(html.Div([
-                html.Div("DATABASE", className="section-label"),
-                _metric("Total",    str(stats["total"]) if stats["total"] else "—"),
-                html.Div(style={"height": "10px"}),
-                _metric("Critical", str(stats["critical"]) if stats["total"] else "—",
-                        glow="red"),
-                html.Div(style={"height": "10px"}),
-                _metric("Avg Score", f'{stats["avg_disruption"]:.3f}' if stats["total"] else "—"),
-
-                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "16px 0"}),
-                html.Div("BY DIMENSION", className="section-label"),
-                *[html.Div([
-                    html.Span(d[:3], style={"fontSize": "10px", "fontWeight": "600",
-                                            "color": _DIM_COLOUR.get(d, "#7d8fa8"),
-                                            "minWidth": "36px", "display": "inline-block"}),
-                    html.Span(str(by_dim.get(d, 0)),
-                              style={"fontFamily": "JetBrains Mono, monospace",
-                                     "fontSize": "11px", "color": "#e8edf5"}),
-                ], style={"marginBottom": "6px"})
-                  for d in ["POLITICAL", "ECONOMIC", "SOCIAL",
-                             "TECHNOLOGICAL", "ENVIRONMENTAL", "LEGAL"]],
-            ], className="war-card"), md=4),
-        ], className="g-3"),
+        html.Div("LIVE SIGNAL STREAM", className="section-label"),
+        html.Div(table, className="war-card", style={"padding": "0"}),
     ])
 
 
-def _tab_chatbot(history: list[dict] | None = None) -> html.Div:
-    db_count      = _db_stats_cached()["total"]
-    hf_status = "Live" if _HF_OK else "No API key"
+def _chat_bubble(text: str, role: str = "assistant") -> html.Div:
+    cls = f"chat-bubble bubble-{role}"
+    return html.Div([
+        html.Div(textwrap.fill(text, 100) if role == "user" else dcc.Markdown(text),
+                 className=cls),
+    ], style={"display": "flex", "justifyContent": "flex-end" if role == "user" else "flex-start",
+              "marginBottom": "12px"})
 
+
+def _tab_chatbot(history: list) -> html.Div:
+    """Strategic Advisor — conversational AI interface."""
     welcome = _chat_bubble(
-        f"Fendt Intelligence Assistant\n\n"
-        f"{db_count} signal(s) indexed in Astra DB. HuggingFace: {hf_status}\n\n"
-        f"Ask about macro-level strategic decisions, regulatory timelines, "
-        f"competitive positioning, or supply chain risks across the EU agricultural market.",
+        "Fendt Relational Brain — Multi-Agent Strategic Advisor\n\n"
+        "Router automatically directs queries to the Calculator Agent "
+        "(quantitative) or Analyst Agent (synthesis). How can I help you today?",
         role="assistant",
     )
     bubbles = [welcome]
-    if history:
-        for msg in history:
-            bubbles.append(_chat_bubble(msg["text"], role=msg["role"]))
+    for msg in history:
+        bubble = _chat_bubble(msg["text"], msg["role"])
+        if msg["role"] == "assistant" and msg.get("badge"):
+            badge = html.Div(
+                msg["badge"],
+                style={
+                    "fontSize": "9px",
+                    "fontFamily": "JetBrains Mono, monospace",
+                    "color": msg.get("badge_colour", "#7d8fa8"),
+                    "marginTop": "6px",
+                    "opacity": "0.75",
+                },
+            )
+            bubble = html.Div([bubble, badge])
+        bubbles.append(bubble)
 
     chips = [
         "What immediate supply chain pivots must Tier-1 OEMs make?",
@@ -752,54 +648,51 @@ def _tab_chatbot(history: list[dict] | None = None) -> html.Div:
 
     return html.Div([
         dbc.Row([
-            dbc.Col(html.Div([
-                dcc.Loading(
-                    html.Div(id="chat-messages", children=bubbles, className="chat-history"),
-                    id="chat-messages-loading",
-                    type="dot",
-                    color="#00e5ff",
-                ),
+            dbc.Col([
+                html.Div(bubbles, id="chat-messages", className="chat-window"),
                 html.Div([
-                    dcc.Input(
-                        id="chat-input", type="text",
-                        placeholder="Ask about EU macro trends, OEM strategy, regulatory risk…",
-                        debounce=False, n_submit=0,
-                        className="chat-input-field",
-                    ),
-                    dbc.Button("Send", id="chat-send", className="btn-send",
-                               color="info", size="sm"),
-                ], className="chat-controls"),
-            ]), md=8),
+                    dcc.Input(id="chat-input", placeholder="Ask a strategic question...",
+                              className="chat-input-field", n_submit=0),
+                    dbc.Button("Send", id="chat-send", color="primary", className="chat-btn"),
+                ], className="chat-input-group"),
+                html.Div([
+                    html.Span("Try: ", style={"fontSize": "10px", "color": "#7d8fa8", "marginRight": "8px"}),
+                    *[dbc.Badge(c[:30] + "...", id=f"chip-{i}", className="chat-chip", color="dark")
+                      for i, c in enumerate(chips)],
+                ], className="chat-chips"),
+            ], md=9),
             dbc.Col(html.Div([
-                html.Div("STRATEGIC PROMPTS", className="section-label"),
-                *[html.Div(q, id=f"chip-{i}", n_clicks=0, className="chip")
-                  for i, q in enumerate(chips)],
+                html.Div("AGENT CAPABILITIES", className="section-label"),
+                html.Div([
+                    html.Div("Calculator Agent", style={"color": "#00e5ff", "fontSize": "11px", "fontWeight": "600"}),
+                    html.Div("Quantitative analysis, score aggregation, trend math.",
+                             style={"fontSize": "10px", "color": "#7d8fa8", "marginBottom": "10px"}),
+                    html.Div("Analyst Agent", style={"color": "#ffd93d", "fontSize": "11px", "fontWeight": "600"}),
+                    html.Div("Qualitative synthesis, RAG-based strategic implications.",
+                             style={"fontSize": "10px", "color": "#7d8fa8"}),
+                ], className="war-card"),
                 html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
-                html.Div("MODEL", className="section-label"),
-                html.Div(_HF_REPO_ID,
-                         style={"fontFamily": "JetBrains Mono, monospace",
-                                "fontSize": "10px", "color": "#7d8fa8"}),
-                html.Div("Universal Strategic Analysis",
-                         style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "4px"}),
-            ], className="war-card"), md=4),
+                html.Div("CONTEXT", className="section-label"),
+                html.Div("Search restricted to Astra DB signals only.",
+                         style={"fontSize": "10px", "color": "#7d8fa8"}),
+            ], className="war-card"), md=3),
         ], className="g-3"),
     ])
 
 
 # ─────────────────────────────────────────────────────────────
-# Tab builders — Phase 2 tabs
+# Knowledge Graph components
 # ─────────────────────────────────────────────────────────────
 
 _GRAPH_JSON = Path(__file__).parent / "data" / "graph.json"
 
-# Colour map: PESTEL category → node colour
-_CAT_COLOUR: dict[str, str] = {
-    "POLITICAL":     "#ff6b6b",
-    "ECONOMIC":      "#ffd93d",
-    "SOCIAL":        "#6bcb77",
-    "TECHNOLOGICAL": "#00e5ff",
-    "ENVIRONMENTAL": "#a29bfe",
-    "LEGAL":         "#fd79a8",
+_CAT_COLOUR = {
+    "POLITICAL":     "#64b5f6",
+    "ECONOMIC":      "#a5d6a7",
+    "SOCIAL":        "#ffcc80",
+    "TECHNOLOGICAL": "#ce93d8",
+    "ENVIRONMENTAL": "#80deea",
+    "LEGAL":         "#ef9a9a",
 }
 
 _CYTO_STYLESHEET = [
@@ -848,34 +741,42 @@ def _load_graph_elements() -> list[dict]:
     """Load data/graph.json and convert to cytoscape elements format."""
     if not _GRAPH_JSON.exists():
         return []
-    raw = json.loads(_GRAPH_JSON.read_text())
-    elements: list[dict] = []
-    for node in raw.get("nodes", []):
-        cat = node.get("category", "")
-        elements.append({
-            "data": {
-                "id":     node["id"],
-                "label":  node.get("label", node["id"])[:40],
-                "colour": _CAT_COLOUR.get(cat, "#9cb3c9"),
-                "category": cat,
-            },
-        })
-    for link in raw.get("links", []):
-        weight = link.get("weight", 0.5)
-        elements.append({
-            "data": {
-                "source":       link["source"],
-                "target":       link["target"],
-                "relationship": link.get("relationship", ""),
-                "weight_px":    max(1, int(weight * 6)),
-            },
-        })
-    return elements
+    try:
+        raw = json.loads(_GRAPH_JSON.read_text())
+        elements: list[dict] = []
+        for node in raw.get("nodes", []):
+            cat = node.get("category", "")
+            elements.append({
+                "data": {
+                    "id":     node["id"],
+                    "label":  node.get("label", node["id"])[:40],
+                    "colour": _CAT_COLOUR.get(cat, "#9cb3c9"),
+                    "category": cat,
+                },
+            })
+        for link in raw.get("links", []):
+            weight = link.get("weight", 0.5)
+            elements.append({
+                "data": {
+                    "source":       link["source"],
+                    "target":       link["target"],
+                    "relationship": link.get("relationship", ""),
+                    "weight_px":    max(1, int(weight * 6)),
+                },
+            })
+        return elements
+    except Exception as exc:
+        log.warning("_load_graph_elements failed: %s", exc)
+        return []
 
 
 def _render_causal_chains() -> list:
     """Build sidebar widgets for the top causal cascade chains."""
-    chains = get_causal_chains(top_n=5)
+    try:
+        chains = get_causal_chains(top_n=5)
+    except Exception:
+        chains = []
+
     if not chains:
         return [html.Div(
             "No cascade chains yet — chains build as signals relate to each other.",
@@ -1061,8 +962,13 @@ _REPORTS_DIR = Path(__file__).parent / "outputs" / "reports"
 
 def _glob_reports() -> list[dict]:
     """Return sorted list of {label, value} dicts for available .md reports."""
-    paths = sorted(_REPORTS_DIR.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
-    return [{"label": p.stem.replace("_", " ").title(), "value": str(p)} for p in paths]
+    try:
+        if not _REPORTS_DIR.exists():
+            return []
+        paths = sorted(_REPORTS_DIR.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+        return [{"label": p.stem.replace("_", " ").title(), "value": str(p)} for p in paths]
+    except Exception:
+        return []
 
 
 def _render_report_body(path: str | None) -> html.Div:
@@ -1414,7 +1320,11 @@ _flask_cache = _FlaskCache(
 @_flask_cache.memoize(timeout=30)
 def _get_all_signals_cached() -> list:
     """Cached get_all() — avoids hitting Astra DB on every tab render."""
-    return _get_db().get_all()
+    try:
+        return _get_db().get_all()
+    except Exception as exc:
+        log.error("_get_all_signals_cached failed: %s", exc)
+        return []
 
 
 @_flask_cache.memoize(timeout=30)
@@ -1531,6 +1441,8 @@ def _layout() -> html.Div:
     ], className="war-shell")
 
 app.layout = _layout()
+
+
 # ─────────────────────────────────────────────────────────────
 # Callbacks
 # ─────────────────────────────────────────────────────────────
@@ -1826,12 +1738,16 @@ def graph_action(rebuild_n: int, infer_n: int) -> str:
     prevent_initial_call=True,
 )
 def export_report(n_clicks: int):
-    html_content = _build_export_html()
-    filename = f"fendt-pestel-report-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}.html"
-    return dcc.send_string(html_content, filename)
+    try:
+        html_content = _build_export_html()
+        filename = f"fendt-pestel-report-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}.html"
+        return dcc.send_string(html_content, filename)
+    except Exception as exc:
+        log.error("export_report failed: %s", exc)
+        return no_update
 
 
-# ── Strategic Reports callback ────────────────────────────────
+# ── Strategic Reports callback ─────────────────────────
 
 @app.callback(
     Output("reports-body", "children"),
@@ -1904,7 +1820,7 @@ def generate_intelligence_brief(n_clicks: int):
     no need to also output reports-body.children (that would be a duplicate output).
     """
     try:
-        db = SignalDB()
+        db = _get_db()
         total = db.count()
         if total == 0:
             return no_update, no_update, "No signals in database — run Scout first."
