@@ -608,15 +608,20 @@ def infer_hidden_relationships(max_hops: int = 3) -> dict:
 
     def _bfs_paths(start: str, visited: set[str], depth: int) -> list[list[str]]:
         """Return all paths [start, ..., end] reachable within `depth` hops."""
-        if depth == 0:
+        if depth <= 0:
             return []
         paths: list[list[str]] = []
-        for neighbour, _ in adjacency.get(start, []):
+        # Safely get neighbors, default to empty list if start node not in adjacency
+        neighbors = adjacency.get(start, [])
+        for neighbour, _ in neighbors:
             if neighbour in visited:
                 continue
+            # Direct 1-hop path
             paths.append([start, neighbour])
-            for suffix in _bfs_paths(neighbour, visited | {neighbour}, depth - 1):
-                paths.append([start] + suffix)
+            # Multi-hop paths
+            if depth > 1:
+                for suffix in _bfs_paths(neighbour, visited | {neighbour}, depth - 1):
+                    paths.append([start] + suffix)
         return paths
 
     all_starts = list(adjacency.keys())

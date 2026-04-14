@@ -104,7 +104,7 @@ def _get_db() -> SignalDB:
 # Design Tokens
 # ─────────────────────────────────────────────────────────────
 
-_DIM_COLOUR = {
+_CAT_COLOUR = {
     "POLITICAL":     "#64b5f6",
     "ECONOMIC":      "#a5d6a7",
     "SOCIAL":        "#ffcc80",
@@ -141,7 +141,7 @@ _CHART_BASE = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
     font_family="Inter, -apple-system, system-ui, sans-serif",
-    font_color="#7d8fa8",
+    font_color="#c4d2de",
     margin=dict(l=36, r=16, t=44, b=36),
     hoverlabel=dict(
         bgcolor="rgba(6,8,13,0.97)",
@@ -156,16 +156,16 @@ _AXIS_Y = dict(
     gridcolor="rgba(255,255,255,0.04)",
     zerolinecolor="rgba(255,255,255,0.06)",
     showline=False,
-    tickfont=dict(size=10, color="#3d4f62"),
+    tickfont=dict(size=10, color="#7d8fa8"),
 )
 _AXIS_X = dict(
     gridcolor="rgba(0,0,0,0)",
     zerolinecolor="rgba(0,0,0,0)",
     showline=False,
-    tickfont=dict(size=10, color="#3d4f62"),
+    tickfont=dict(size=10, color="#7d8fa8"),
 )
 _AXIS_NONE = dict(showgrid=False, zeroline=False, showline=False,
-                  tickfont=dict(size=10, color="#3d4f62"))
+                  tickfont=dict(size=10, color="#7d8fa8"))
 
 
 # ─────────────────────────────────────────────────────────────
@@ -315,11 +315,11 @@ def _chart_radar(signals: list[Signal],
         fig.add_vrect(x0=x0, x1=x1, fillcolor=fill, line_width=0, layer="below")
 
     if not filtered:
-        fig.add_annotation(
-            text="No signals at this threshold. Lower the filter or run the Scout.",
-            x=18, y=0.5, showarrow=False,
-            font=dict(size=13, color="#3d4f62"),
-        )
+            fig.add_annotation(
+                text="No signals at this threshold. Lower the filter or run the Scout.",
+                x=18, y=0.5, showarrow=False,
+                font=dict(size=13, color="#7d8fa8"),
+            )
     else:
         for dim, col in _DIM_COLOUR.items():
             sigs = [s for s in filtered if s.pestel_dimension.value == dim]
@@ -1497,38 +1497,40 @@ topbar = html.Header([
 ], className="war-topbar")
 
 # ── Full Layout ────────────────────────────────────────────────
-app.layout = html.Div([
-    sidebar,
-    html.Div([
-        topbar,
-        html.Nav(
-            dbc.Tabs(
-                [dbc.Tab(label=lbl, tab_id=tid) for tid, lbl in _TABS],
-                id="main-tabs",
-                active_tab="overview",
-                className="war-tabs",
+def _layout() -> html.Div:
+    return html.Div([
+        sidebar,
+        html.Div([
+            topbar,
+            html.Nav(
+                dbc.Tabs(
+                    [dbc.Tab(label=lbl, tab_id=tid) for tid, lbl in _TABS],
+                    id="main-tabs",
+                    active_tab="overview",
+                    className="war-tabs",
+                ),
+                className="war-tabnav",
             ),
-            className="war-tabnav",
-        ),
-        dcc.Loading(
-            html.Main(id="page-canvas", className="war-canvas"),
-            id="page-canvas-loading",
-            type="circle",
-            color="#00e5ff",
-            style={"position": "relative"},
-        ),
-    ], className="war-main"),
+            dcc.Loading(
+                html.Div(id="page-canvas", className="war-canvas"),
+                id="page-canvas-loading",
+                type="circle",
+                color="#00e5ff",
+                style={"position": "relative"},
+            ),
+        ], className="war-main"),
 
-    # Persistent state
-    dcc.Store(id="chat-store",    data=[]),
-    dcc.Store(id="signals-store", data=[], storage_type="memory"),  # cross-tab signal cache
-    dcc.Download(id="export-download"),
-    dcc.Download(id="reports-pdf-download"),
-    # 30-second auto-refresh (sponsor requirement #5)
-    dcc.Interval(id="interval-30s", interval=30_000, n_intervals=0),
-], className="war-shell")
+        # Persistent state
+        dcc.Store(id="chat-store",    data=[]),
+        dcc.Store(id="signals-store", data=[], storage_type="memory"),  # cross-tab signal cache
+        dcc.Store(id="reports-last-selection", data=None),
+        dcc.Download(id="export-download"),
+        dcc.Download(id="reports-pdf-download"),
+        # 30-second auto-refresh (sponsor requirement #5)
+        dcc.Interval(id="interval-30s", interval=30_000, n_intervals=0),
+    ], className="war-shell")
 
-
+app.layout = _layout()
 # ─────────────────────────────────────────────────────────────
 # Callbacks
 # ─────────────────────────────────────────────────────────────
@@ -1834,29 +1836,45 @@ def export_report(n_clicks: int):
 @app.callback(
     Output("reports-body", "children"),
     Input("reports-dropdown", "value"),
-    prevent_initial_call=True,   # initial content embedded by _tab_reports()
+    prevent_initial_call=True,
 )
 def render_report(path: str | None) -> html.Div:
+    if not path:
+        return no_update
+    # Only render if it's a real user selection, not the initial default
+    # (prevents duplicate rendering on tab load)
     return _render_report_body(path)
 
 
 @app.callback(
     Output("reports-pdf-download", "data"),
+    Output("reports-last-selection", "data"),
     Input("reports-export-pdf-btn", "n_clicks"),
-    State("reports-dropdown", "value"),
+    Input("reports-dropdown", "value"),
+    State("reports-last-selection", "data"),
     prevent_initial_call=True,
 )
-def export_report_pdf(_n: int, path: str | None):
-    if not path or not _PDF_OK:
-        return no_update
-    try:
-        content  = Path(path).read_text(encoding="utf-8")
-        pdf_bytes = _md_to_pdf_bytes(content)
-        filename  = f"{Path(path).stem}-{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf"
-        return dcc.send_bytes(pdf_bytes, filename)
-    except Exception as exc:
-        log.error("export_report_pdf failed: %s", exc)
-        return no_update
+def export_report_pdf(n_clicks: int, current_path: str | None, last_path: str | None):
+    triggered = callback_context.triggered_id
+
+    # If the dropdown changed, update the last_selection and DO NOT download
+    if triggered == "reports-dropdown":
+        return no_update, current_path
+
+    # If the button was clicked, verify it's a real click and then download
+    if triggered == "reports-export-pdf-btn" and n_clicks:
+        if not current_path or not _PDF_OK:
+            return no_update, no_update
+        try:
+            content  = Path(current_path).read_text(encoding="utf-8")
+            pdf_bytes = _md_to_pdf_bytes(content)
+            filename  = f"{Path(current_path).stem}-{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf"
+            return dcc.send_bytes(pdf_bytes, filename), current_path
+        except Exception as exc:
+            log.error("export_report_pdf failed: %s", exc)
+            return no_update, current_path
+
+    return no_update, current_path
 
 
 # ── Generate Intelligence Brief callback (background) ─────────
