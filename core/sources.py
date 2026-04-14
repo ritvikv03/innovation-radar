@@ -3,7 +3,7 @@ core/sources.py — PESTEL-EL Intelligence Source Registry
 =========================================================
 Defines the canonical list of sources the Scout scrapes.
 Each entry maps to one PESTEL dimension so the router can
-tag signals before Gemini scoring.
+tag signals before HuggingFace scoring.
 
 Adding a new source:
     Append a dict to PESTEL_SOURCES with all required keys.
@@ -91,5 +91,5 @@ PESTEL_SOURCES: list[dict] = [
 # Minimum character length for scraped text to be worth scoring
 MIN_TEXT_LENGTH = 200
 
-# Maximum characters to send to Gemini per article
+# Maximum characters to send to the HuggingFace model per article
 MAX_TEXT_LENGTH = 8_000

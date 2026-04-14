@@ -616,7 +616,7 @@ def infer_hidden_relationships(max_hops: int = 3) -> dict:
                 continue
             paths.append([start, neighbour])
             for suffix in _bfs_paths(neighbour, visited | {neighbour}, depth - 1):
-                paths.append([start] + suffix[1:])
+                paths.append([start] + suffix)
         return paths
 
     all_starts = list(adjacency.keys())

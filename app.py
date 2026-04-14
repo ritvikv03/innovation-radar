@@ -82,7 +82,7 @@ log = get_logger(__name__)
 
 _HF_TOKEN   = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
 _HF_OK      = bool(_HF_TOKEN)
-_HF_REPO_ID = "meta-llama/Llama-3.2-3B-Instruct"
+_HF_REPO_ID = "meta-llama/Llama-3.1-8B-Instruct"
 
 # ─────────────────────────────────────────────────────────────
 # DB singleton — all access via SignalDB (CLAUDE.md rule)
@@ -912,7 +912,8 @@ def _render_inferred_relationships() -> list:
             t for t in graph.get("triples", [])
             if t.get("metadata", {}).get("inferred")
         ]
-    except Exception:
+    except Exception as exc:
+        log.warning("_render_inferred_relationships: %s", exc)
         return []
 
     if not inferred:
@@ -1554,7 +1555,8 @@ def refresh_signals_store(_i: int, _n: int) -> list[dict]:
             }
             for s, _ in results
         ]
-    except Exception:
+    except Exception as exc:
+        log.error("refresh_signals_store failed: %s", exc)
         return []
 
 

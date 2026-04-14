@@ -2,8 +2,12 @@
 tests/test_phase1.py — Phase 1 Integration Tests
 =================================================
 Tests scheduler health state, scraper resilience, pipeline
-validation, and DB persistence. All external APIs (Gemini,
+validation, and DB persistence. All external APIs (HuggingFace,
 Firecrawl) are mocked so these run fully offline.
+
+Astra DB tests (section 3) are skipped automatically when
+ASTRA_DB_TOKEN is not set — they are integration tests that
+require a live Astra DB connection.
 
 Run:
     cd /path/to/innovation-radar
@@ -126,11 +130,16 @@ def test_signal_metadata_roundtrip():
 # 3. SignalDB
 # ─────────────────────────────────────────────────────────────
 
+_ASTRA_AVAILABLE = bool(os.getenv("ASTRA_DB_TOKEN"))
+
+
 @pytest.fixture()
-def tmp_db(tmp_path):
-    """Isolated ChromaDB instance per test."""
+def tmp_db():
+    """Live Astra DB instance — skipped when ASTRA_DB_TOKEN is not set."""
+    if not _ASTRA_AVAILABLE:
+        pytest.skip("ASTRA_DB_TOKEN not set — skipping Astra DB integration tests")
     from core.database import SignalDB
-    return SignalDB(db_dir=tmp_path)
+    return SignalDB()
 
 
 def test_db_insert_and_count(tmp_db):
@@ -190,10 +199,10 @@ def test_db_clear(tmp_db):
 
 
 # ─────────────────────────────────────────────────────────────
-# 4. Pipeline (Gemini mocked)
+# 4. Pipeline (HuggingFace mocked)
 # ─────────────────────────────────────────────────────────────
 
-_FAKE_GEMINI_RESPONSE = {
+_FAKE_LLM_RESPONSE = {
     "title": "John Deere Autonomous 8R Launches Q3 2026 — Fendt Faces 2-Year Gap",
     "pestel_dimension": "TECHNOLOGICAL",
     "content": "John Deere has announced commercial availability of a fully autonomous "
@@ -203,65 +212,65 @@ _FAKE_GEMINI_RESPONSE = {
     "impact_score": 0.90,
     "novelty_score": 0.80,
     "velocity_score": 0.70,
-    "severity_score": 0.85,
     "entities": ["John Deere", "Fendt", "AGCO"],
     "themes": ["autonomous tractor", "competitive gap"],
     "reasoning": "First commercial autonomous tractor sets 2-year competitive clock.",
 }
 
 
-def _mock_gemini_response(text_content: str):
-    mock_resp = MagicMock()
-    mock_resp.text = json.dumps(text_content) if isinstance(text_content, dict) else text_content
-    return mock_resp
+def _mock_hf_client(json_payload: dict):
+    """Return a mock InferenceClient whose chat_completion returns the given JSON."""
+    mock_choice = MagicMock()
+    mock_choice.message.content = json.dumps(json_payload)
+    mock_response = MagicMock()
+    mock_response.choices = [mock_choice]
+    mock_client = MagicMock()
+    mock_client.chat_completion.return_value = mock_response
+    return mock_client
 
 
-@patch("core.pipeline.genai")
-def test_score_text_returns_signal_and_response(mock_genai):
-    """score_text() must return (Signal, GeminiScoreResponse) with valid data."""
-    mock_model = MagicMock()
-    mock_model.generate_content.return_value = _mock_gemini_response(_FAKE_GEMINI_RESPONSE)
-    mock_genai.GenerativeModel.return_value = mock_model
-    mock_genai.GenerationConfig = MagicMock()
-
-    # Set the key so pipeline doesn't bail early
-    import core.pipeline as pl
-    original_key = pl._API_KEY
-    pl._API_KEY = "fake-key"
-
-    try:
+def test_score_text_returns_signal_and_response():
+    """score_text() must return (Signal, LLMScoreResponse) with valid data."""
+    with patch("huggingface_hub.InferenceClient") as mock_hf_cls, \
+         patch("core.pipeline._HF_TOKEN", "fake-hf-token"):
+        mock_hf_cls.return_value = _mock_hf_client(_FAKE_LLM_RESPONSE)
         from core.pipeline import score_text
-        signal, scored = score_text("John Deere launches autonomous tractor in 2026.")
-    finally:
-        pl._API_KEY = original_key
+        signal, scored = score_text(
+            "John Deere has announced commercial availability of a fully autonomous tractor "
+            "in North America for the 2026 season, creating a significant competitive gap "
+            "for Fendt whose autonomy roadmap currently targets 2028. Industry analysts "
+            "expect rapid adoption across large-scale US grain farms."
+        )
 
-    assert signal.title == _FAKE_GEMINI_RESPONSE["title"]
+    assert signal.title == _FAKE_LLM_RESPONSE["title"]
     assert signal.pestel_dimension == PESTELDimension.TECHNOLOGICAL
     assert signal.disruption_score > 0
-    assert scored.severity_score == 0.85
+    assert scored.impact_score == 0.90
 
 
-@patch("core.pipeline.genai")
-def test_score_and_save_persists(mock_genai, tmp_db):
-    """score_and_save() must write to ChromaDB."""
-    mock_model = MagicMock()
-    mock_model.generate_content.return_value = _mock_gemini_response(_FAKE_GEMINI_RESPONSE)
-    mock_genai.GenerativeModel.return_value = mock_model
-    mock_genai.GenerationConfig = MagicMock()
+def test_score_and_save_persists():
+    """score_and_save() must call SignalDB.insert() with the scored signal."""
+    mock_db = MagicMock()
+    mock_db.count.return_value = 0     # dedup check: no existing signals
+    mock_db.search.return_value = []   # dedup search: no near-duplicates
 
-    import core.pipeline as pl
-    original_key = pl._API_KEY
-    pl._API_KEY = "fake-key"
-
-    try:
+    with patch("huggingface_hub.InferenceClient") as mock_hf_cls, \
+         patch("core.pipeline._HF_TOKEN", "fake-hf-token"):
+        mock_hf_cls.return_value = _mock_hf_client(_FAKE_LLM_RESPONSE)
         from core.pipeline import score_and_save
-        signal, _ = score_and_save("Article text", db=tmp_db)
-    finally:
-        pl._API_KEY = original_key
+        result = score_and_save(
+            "John Deere has announced commercial availability of a fully autonomous tractor "
+            "in North America for the 2026 season, creating a significant competitive gap "
+            "for Fendt whose autonomy roadmap currently targets 2028. Industry analysts "
+            "expect rapid adoption across large-scale US grain farms.",
+            db=mock_db,
+        )
 
-    assert tmp_db.count() == 1
-    fetched = tmp_db.get_by_id(signal.id)
-    assert fetched is not None
+    assert result is not None
+    signal, _ = result
+    mock_db.insert.assert_called_once()
+    inserted_signal = mock_db.insert.call_args[0][0]
+    assert inserted_signal.id == signal.id
 
 
 # ─────────────────────────────────────────────────────────────

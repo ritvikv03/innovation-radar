@@ -3,11 +3,11 @@ tests/test_phase2.py — Phase 2 Enterprise Resilience Tests
 ===========================================================
 Covers:
   1. retry_with_backoff — backoff math, non-retryable pass-through, success on retry
-  2. Pipeline Gemini retry — transient errors retried; validation errors not retried
+  2. Pipeline HuggingFace retry — transient errors retried; validation errors not retried
   3. Scraper type contracts — scrape_source returns list[ScrapedArticle] shape
   4. Scheduler per-source timeout — slow source is killed; rest of cycle continues
 
-All external APIs (Gemini, requests, network) are mocked.
+All external APIs (HuggingFace, requests, network) are mocked.
 
 Run:
     cd /path/to/innovation-radar
@@ -98,12 +98,12 @@ def test_retry_delay_increases_exponentially(monkeypatch):
 
 
 # ─────────────────────────────────────────────────────────────
-# 2. Pipeline Gemini retry
+# 2. Pipeline HuggingFace retry
 # ─────────────────────────────────────────────────────────────
 
 import json
 
-_FAKE_GEMINI_RESPONSE = {
+_FAKE_LLM_RESPONSE = {
     "title": "EU Tractor Autonomy Mandate Reshapes Market by 2028",
     "pestel_dimension": "LEGAL",
     "content": "The European Commission has proposed binding autonomy readiness standards "
@@ -112,76 +112,73 @@ _FAKE_GEMINI_RESPONSE = {
     "impact_score": 0.88,
     "novelty_score": 0.74,
     "velocity_score": 0.69,
-    "severity_score": 0.80,
     "entities": ["European Commission", "Fendt", "John Deere"],
     "themes": ["autonomy", "compliance", "OEM regulation"],
     "reasoning": "Binding EU regulation forces immediate roadmap realignment.",
 }
 
 
-def _mock_gemini(text_content: dict | str):
+def _make_hf_response(json_payload: dict):
+    """Return a mock InferenceClient response with JSON payload as content."""
+    mock_choice = MagicMock()
+    mock_choice.message.content = json.dumps(json_payload)
     mock_resp = MagicMock()
-    mock_resp.text = (
-        json.dumps(text_content) if isinstance(text_content, dict) else text_content
-    )
+    mock_resp.choices = [mock_choice]
     return mock_resp
 
 
-@patch("core.pipeline.genai")
-def test_pipeline_retries_on_transient_api_error(mock_genai):
+def test_pipeline_retries_on_transient_api_error():
     """
-    If Gemini raises a RuntimeError on the first call but succeeds on the second,
+    If HuggingFace raises a RuntimeError on the first call but succeeds on the second,
     score_text() must succeed (not propagate the transient error).
     """
-    mock_model = MagicMock()
-    mock_model.generate_content.side_effect = [
+    mock_client = MagicMock()
+    mock_client.chat_completion.side_effect = [
         RuntimeError("503 Service Unavailable"),
-        _mock_gemini(_FAKE_GEMINI_RESPONSE),
+        _make_hf_response(_FAKE_LLM_RESPONSE),
     ]
-    mock_genai.GenerativeModel.return_value = mock_model
-    mock_genai.GenerationConfig = MagicMock()
 
-    import core.pipeline as pl
-    original_key = pl._API_KEY
-    pl._API_KEY = "fake-key"
+    with patch("huggingface_hub.InferenceClient", return_value=mock_client), \
+         patch("core.pipeline._HF_TOKEN", "fake-hf-token"), \
+         patch("core.utils.time.sleep"):
+        from core.pipeline import score_text
+        signal, scored = score_text(
+            "The European Commission has proposed binding autonomy readiness standards "
+            "for all tractors sold in the EU after 2028, creating compliance urgency for "
+            "OEMs such as Fendt and John Deere. The regulation requires full GPS-guided "
+            "operation capability and real-time telemetry reporting for fleet monitoring."
+        )
 
-    try:
-        # Patch sleep so the test doesn't actually wait
-        with patch("core.utils.time.sleep"):
-            from core.pipeline import score_text
-            signal, scored = score_text("Some article text about EU tractors.")
-    finally:
-        pl._API_KEY = original_key
-
-    assert signal.title == _FAKE_GEMINI_RESPONSE["title"]
-    assert mock_model.generate_content.call_count == 2   # one failure + one success
+    assert signal.title == _FAKE_LLM_RESPONSE["title"]
+    assert mock_client.chat_completion.call_count == 2   # one failure + one success
 
 
-@patch("core.pipeline.genai")
-def test_pipeline_does_not_retry_on_invalid_json(mock_genai):
+def test_pipeline_does_not_retry_on_invalid_json():
     """
-    If Gemini returns malformed JSON, that's a ValueError (non-retryable).
+    If HuggingFace returns malformed JSON, that's a ValueError (non-retryable).
     score_text() must raise immediately — no retry.
     """
-    mock_model = MagicMock()
-    mock_model.generate_content.return_value = _mock_gemini("not valid json {{{")
-    mock_genai.GenerativeModel.return_value = mock_model
-    mock_genai.GenerationConfig = MagicMock()
+    mock_choice = MagicMock()
+    mock_choice.message.content = "not valid json {{{"
+    mock_resp = MagicMock()
+    mock_resp.choices = [mock_choice]
+    mock_client = MagicMock()
+    mock_client.chat_completion.return_value = mock_resp
 
-    import core.pipeline as pl
-    original_key = pl._API_KEY
-    pl._API_KEY = "fake-key"
+    with patch("huggingface_hub.InferenceClient", return_value=mock_client), \
+         patch("core.pipeline._HF_TOKEN", "fake-hf-token"), \
+         patch("core.utils.time.sleep"):
+        from core.pipeline import score_text
+        with pytest.raises(ValueError):
+            score_text(
+                "The European Commission has proposed binding autonomy readiness standards "
+                "for all tractors sold in the EU after 2028, creating compliance urgency for "
+                "OEMs such as Fendt and John Deere. The regulation requires full GPS-guided "
+                "operation capability and real-time telemetry reporting for fleet monitoring."
+            )
 
-    try:
-        with patch("core.utils.time.sleep"):
-            from core.pipeline import score_text
-            with pytest.raises(ValueError):
-                score_text("Some text.")
-    finally:
-        pl._API_KEY = original_key
-
-    # JSON parse failure is non-retryable — Gemini called exactly once
-    assert mock_model.generate_content.call_count == 1
+    # JSON parse failure is non-retryable — HF called exactly once
+    assert mock_client.chat_completion.call_count == 1
 
 
 # ─────────────────────────────────────────────────────────────

@@ -1,7 +1,415 @@
 {
   "directed": true,
-  "nodes": [],
-  "links": [],
-  "triples": [],
+  "nodes": [
+    {
+      "id": "51489681-4328-4fc7-8c7b-efcaf68fb581",
+      "label": "Eurostat Dataset on Purchase Prices...",
+      "category": "ECONOMIC",
+      "created_at": "2026-04-14T00:13:25.956338+00:00",
+      "source": "https://ec.europa.eu/eurostat/databrowser/view/APRI_AP_INA/default/table"
+    },
+    {
+      "id": "612b3de5-faaa-448d-b0d8-ce54dd6c4ab9",
+      "label": "Eurostat Dataset: Purchase Prices o...",
+      "category": "ECONOMIC",
+      "created_at": "2026-04-14T14:37:09.104516+00:00",
+      "source": "https://ec.europa.eu/eurostat/databrowser/view/APRI_AP_INA/default/table"
+    },
+    {
+      "id": "807fc1fc-f44e-40dc-a6a9-6afe95850d89",
+      "label": "Eurostat Dataset on Agricultural Pr...",
+      "category": "ECONOMIC",
+      "created_at": "2026-04-14T02:37:40.102113+00:00",
+      "source": "https://ec.europa.eu/eurostat/databrowser/view/APRI_AP_INA/default/table"
+    },
+    {
+      "id": "8fc67ace-9145-491c-8b9a-ae7aa0a5a04c",
+      "label": "EU Agricultural Machinery Regulatio...",
+      "category": "LEGAL",
+      "created_at": "2026-04-14T00:13:28.210199+00:00",
+      "source": "https://eur-lex.europa.eu/search.html?qid=1&text=agricultural+machinery&scope=EURLEX&type=quick&lang=en&displayProfile=allResults"
+    },
+    {
+      "id": "cb139d58-8524-4f8d-8dca-db6b616fe598",
+      "label": "EU Regulations on Machinery and Agr...",
+      "category": "LEGAL",
+      "created_at": "2026-04-14T14:37:12.052834+00:00",
+      "source": "https://eur-lex.europa.eu/search.html?qid=1&text=agricultural+machinery&scope=EURLEX&type=quick&lang=en&displayProfile=allResults"
+    },
+    {
+      "id": "4163cda5-30c8-4ce3-a13f-f96b8b05ad19",
+      "label": "EU Regulations on Agricultural Mach...",
+      "category": "LEGAL",
+      "created_at": "2026-04-14T02:37:41.951981+00:00",
+      "source": "https://eur-lex.europa.eu/search.html?qid=1&text=agricultural+machinery&scope=EURLEX&type=quick&lang=en&displayProfile=allResults"
+    },
+    {
+      "id": "53b1eb1d-7d4b-4fe6-a581-e1de5ab6a74a",
+      "label": "EU CAP Reform 2026",
+      "category": "LEGAL",
+      "created_at": "2026-04-14T00:13:32.637675+00:00",
+      "source": "https://eur-lex.europa.eu/search.html?qid=1&text=CAP+reform+2026&scope=EURLEX&type=quick&lang=en"
+    },
+    {
+      "id": "29c0be72-0d90-493a-9e76-3dffdc794c68",
+      "label": "EU CAP Reform 2026",
+      "category": "LEGAL",
+      "created_at": "2026-04-14T14:37:17.920650+00:00",
+      "source": "https://eur-lex.europa.eu/search.html?qid=1&text=CAP+reform+2026&scope=EURLEX&type=quick&lang=en"
+    },
+    {
+      "id": "00e92559-0e0a-4779-ba7d-832017891c7e",
+      "label": "CAP Reform 2026",
+      "category": "LEGAL",
+      "created_at": "2026-04-14T02:37:43.408413+00:00",
+      "source": "https://eur-lex.europa.eu/search.html?qid=1&text=CAP+reform+2026&scope=EURLEX&type=quick&lang=en"
+    },
+    {
+      "id": "6ab25cf6-f9da-46e9-aeef-b2794898d729",
+      "label": "EU Funding for Agricultural Robotic...",
+      "category": "TECHNOLOGICAL",
+      "created_at": "2026-04-14T00:13:34.371579+00:00",
+      "source": "https://cordis.europa.eu/search/en?q=agricultural+robotics&p=1&num=5&srt=Relevance:decreasing"
+    },
+    {
+      "id": "c7c43520-929a-42eb-ac5d-170bac55b1ba",
+      "label": "EU Funding for Agricultural Robotic...",
+      "category": "TECHNOLOGICAL",
+      "created_at": "2026-04-14T02:37:45.064236+00:00",
+      "source": "https://cordis.europa.eu/search/en?q=agricultural+robotics&p=1&num=5&srt=Relevance:decreasing"
+    },
+    {
+      "id": "aab2ee59-9fcd-4c87-90e5-84462bf0a22c",
+      "label": "EU Agricultural Robotics Projects",
+      "category": "TECHNOLOGICAL",
+      "created_at": "2026-04-14T14:37:26.191513+00:00",
+      "source": "https://cordis.europa.eu/search/en?q=agricultural+robotics&p=1&num=5&srt=Relevance:decreasing"
+    },
+    {
+      "id": "a842c3d0-a9f9-4390-9f3a-55a4c59b542a",
+      "label": "EU Agricultural Machinery Market Up...",
+      "category": "TECHNOLOGICAL",
+      "created_at": "2026-04-14T00:13:36.616887+00:00",
+      "source": "https://www.agriland.co.uk/farming-news/category/machinery/"
+    },
+    {
+      "id": "d2e387b4-ac7d-4291-863d-6b366827aede",
+      "label": "EU Agricultural Machinery Market Up...",
+      "category": "TECHNOLOGICAL",
+      "created_at": "2026-04-14T14:37:31.124509+00:00",
+      "source": "https://www.agriland.co.uk/farming-news/category/machinery/"
+    },
+    {
+      "id": "7f395faf-46b2-4f3c-93df-fc6101f4a617",
+      "label": "EU Agricultural Machinery Market Up...",
+      "category": "TECHNOLOGICAL",
+      "created_at": "2026-04-14T02:37:46.592688+00:00",
+      "source": "https://www.agriland.co.uk/farming-news/category/machinery/"
+    },
+    {
+      "id": "4ce8bfcc-0db2-4863-b801-2127d286a4ec",
+      "label": "COPA-COGECA Press Release Mailing L...",
+      "category": "SOCIAL",
+      "created_at": "2026-04-14T00:13:53.587217+00:00",
+      "source": "https://copa-cogeca.eu/press-releases"
+    },
+    {
+      "id": "dd0da22e-1789-4549-9b0b-6c1e7e8caade",
+      "label": "COPA-COGECA Press Release Mailing L...",
+      "category": "SOCIAL",
+      "created_at": "2026-04-14T02:37:49.661694+00:00",
+      "source": "https://copa-cogeca.eu/press-releases"
+    },
+    {
+      "id": "b5bcfc56-e660-47be-ade1-1c1ff779e1e8",
+      "label": "EEA EU Agriculture Page Not Found",
+      "category": "ENVIRONMENTAL",
+      "created_at": "2026-04-14T02:37:48.097605+00:00",
+      "source": "https://www.eea.europa.eu/en/topics/in-depth/agriculture"
+    },
+    {
+      "id": "be827b61-c2c6-4316-a028-60aed133694a",
+      "label": "EEA EU Agriculture Page Not Found",
+      "category": "ENVIRONMENTAL",
+      "created_at": "2026-04-14T14:37:39.706161+00:00",
+      "source": "https://www.eea.europa.eu/en/topics/in-depth/agriculture"
+    }
+  ],
+  "links": [
+    {
+      "source": "cb139d58-8524-4f8d-8dca-db6b616fe598",
+      "target": "8fc67ace-9145-491c-8b9a-ae7aa0a5a04c",
+      "relationship": "DEPENDS_ON",
+      "pillar": "LEGAL",
+      "weight": 0.918,
+      "timestamp": "2026-04-14T14:37:12.052834+00:00",
+      "source_url": "https://eur-lex.europa.eu/search.html?qid=1&text=agricultural+machinery&scope=EURLEX&type=quick&lang=en&displayProfile=allResults"
+    },
+    {
+      "source": "cb139d58-8524-4f8d-8dca-db6b616fe598",
+      "target": "4163cda5-30c8-4ce3-a13f-f96b8b05ad19",
+      "relationship": "CONFLICTS_WITH",
+      "pillar": "LEGAL",
+      "weight": 0.83,
+      "timestamp": "2026-04-14T14:37:12.052834+00:00",
+      "source_url": "https://eur-lex.europa.eu/search.html?qid=1&text=agricultural+machinery&scope=EURLEX&type=quick&lang=en&displayProfile=allResults"
+    },
+    {
+      "source": "29c0be72-0d90-493a-9e76-3dffdc794c68",
+      "target": "00e92559-0e0a-4779-ba7d-832017891c7e",
+      "relationship": "DEPENDS_ON",
+      "pillar": "LEGAL",
+      "weight": 0.926,
+      "timestamp": "2026-04-14T14:37:17.920650+00:00",
+      "source_url": "https://eur-lex.europa.eu/search.html?qid=1&text=CAP+reform+2026&scope=EURLEX&type=quick&lang=en"
+    },
+    {
+      "source": "29c0be72-0d90-493a-9e76-3dffdc794c68",
+      "target": "53b1eb1d-7d4b-4fe6-a581-e1de5ab6a74a",
+      "relationship": "DEPENDS_ON",
+      "pillar": "LEGAL",
+      "weight": 0.922,
+      "timestamp": "2026-04-14T14:37:17.920650+00:00",
+      "source_url": "https://eur-lex.europa.eu/search.html?qid=1&text=CAP+reform+2026&scope=EURLEX&type=quick&lang=en"
+    },
+    {
+      "source": "aab2ee59-9fcd-4c87-90e5-84462bf0a22c",
+      "target": "6ab25cf6-f9da-46e9-aeef-b2794898d729",
+      "relationship": "DRIVES",
+      "pillar": "TECHNOLOGICAL",
+      "weight": 0.808,
+      "timestamp": "2026-04-14T14:37:26.191513+00:00",
+      "source_url": "https://cordis.europa.eu/search/en?q=agricultural+robotics&p=1&num=5&srt=Relevance:decreasing"
+    },
+    {
+      "source": "aab2ee59-9fcd-4c87-90e5-84462bf0a22c",
+      "target": "c7c43520-929a-42eb-ac5d-170bac55b1ba",
+      "relationship": "DRIVES",
+      "pillar": "TECHNOLOGICAL",
+      "weight": 0.802,
+      "timestamp": "2026-04-14T14:37:26.191513+00:00",
+      "source_url": "https://cordis.europa.eu/search/en?q=agricultural+robotics&p=1&num=5&srt=Relevance:decreasing"
+    },
+    {
+      "source": "d2e387b4-ac7d-4291-863d-6b366827aede",
+      "target": "a842c3d0-a9f9-4390-9f3a-55a4c59b542a",
+      "relationship": "DEPENDS_ON",
+      "pillar": "TECHNOLOGICAL",
+      "weight": 0.879,
+      "timestamp": "2026-04-14T14:37:31.124509+00:00",
+      "source_url": "https://www.agriland.co.uk/farming-news/category/machinery/"
+    },
+    {
+      "source": "d2e387b4-ac7d-4291-863d-6b366827aede",
+      "target": "7f395faf-46b2-4f3c-93df-fc6101f4a617",
+      "relationship": "DECREASES",
+      "pillar": "TECHNOLOGICAL",
+      "weight": 0.863,
+      "timestamp": "2026-04-14T14:37:31.124509+00:00",
+      "source_url": "https://www.agriland.co.uk/farming-news/category/machinery/"
+    }
+  ],
+  "triples": [
+    {
+      "id": "cb139d58_8fc67ace",
+      "subject": {
+        "id": "cb139d58-8524-4f8d-8dca-db6b616fe598",
+        "label": "EU Regulations on Machinery and Agr...",
+        "type": "Signal",
+        "pillar": "LEGAL"
+      },
+      "predicate": "DEPENDS_ON",
+      "object": {
+        "id": "8fc67ace-9145-491c-8b9a-ae7aa0a5a04c",
+        "label": "EU Agricultural Machinery Regulatio...",
+        "type": "Signal",
+        "pillar": "LEGAL"
+      },
+      "metadata": {
+        "weight": 0.918,
+        "timestamp": "2026-04-14T14:37:12.052834+00:00",
+        "source_url": "https://eur-lex.europa.eu/search.html?qid=1&text=agricultural+machinery&scope=EURLEX&type=quick&lang=en&displayProfile=allResults",
+        "causal_chain": [
+          "LEGAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "cb139d58_4163cda5",
+      "subject": {
+        "id": "cb139d58-8524-4f8d-8dca-db6b616fe598",
+        "label": "EU Regulations on Machinery and Agr...",
+        "type": "Signal",
+        "pillar": "LEGAL"
+      },
+      "predicate": "CONFLICTS_WITH",
+      "object": {
+        "id": "4163cda5-30c8-4ce3-a13f-f96b8b05ad19",
+        "label": "EU Regulations on Agricultural Mach...",
+        "type": "Signal",
+        "pillar": "LEGAL"
+      },
+      "metadata": {
+        "weight": 0.83,
+        "timestamp": "2026-04-14T14:37:12.052834+00:00",
+        "source_url": "https://eur-lex.europa.eu/search.html?qid=1&text=agricultural+machinery&scope=EURLEX&type=quick&lang=en&displayProfile=allResults",
+        "causal_chain": [
+          "LEGAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "29c0be72_00e92559",
+      "subject": {
+        "id": "29c0be72-0d90-493a-9e76-3dffdc794c68",
+        "label": "EU CAP Reform 2026",
+        "type": "Signal",
+        "pillar": "LEGAL"
+      },
+      "predicate": "DEPENDS_ON",
+      "object": {
+        "id": "00e92559-0e0a-4779-ba7d-832017891c7e",
+        "label": "CAP Reform 2026",
+        "type": "Signal",
+        "pillar": "LEGAL"
+      },
+      "metadata": {
+        "weight": 0.926,
+        "timestamp": "2026-04-14T14:37:17.920650+00:00",
+        "source_url": "https://eur-lex.europa.eu/search.html?qid=1&text=CAP+reform+2026&scope=EURLEX&type=quick&lang=en",
+        "causal_chain": [
+          "LEGAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "29c0be72_53b1eb1d",
+      "subject": {
+        "id": "29c0be72-0d90-493a-9e76-3dffdc794c68",
+        "label": "EU CAP Reform 2026",
+        "type": "Signal",
+        "pillar": "LEGAL"
+      },
+      "predicate": "DEPENDS_ON",
+      "object": {
+        "id": "53b1eb1d-7d4b-4fe6-a581-e1de5ab6a74a",
+        "label": "EU CAP Reform 2026",
+        "type": "Signal",
+        "pillar": "LEGAL"
+      },
+      "metadata": {
+        "weight": 0.922,
+        "timestamp": "2026-04-14T14:37:17.920650+00:00",
+        "source_url": "https://eur-lex.europa.eu/search.html?qid=1&text=CAP+reform+2026&scope=EURLEX&type=quick&lang=en",
+        "causal_chain": [
+          "LEGAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "aab2ee59_6ab25cf6",
+      "subject": {
+        "id": "aab2ee59-9fcd-4c87-90e5-84462bf0a22c",
+        "label": "EU Agricultural Robotics Projects",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "predicate": "DRIVES",
+      "object": {
+        "id": "6ab25cf6-f9da-46e9-aeef-b2794898d729",
+        "label": "EU Funding for Agricultural Robotic...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "metadata": {
+        "weight": 0.808,
+        "timestamp": "2026-04-14T14:37:26.191513+00:00",
+        "source_url": "https://cordis.europa.eu/search/en?q=agricultural+robotics&p=1&num=5&srt=Relevance:decreasing",
+        "causal_chain": [
+          "TECHNOLOGICAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "aab2ee59_c7c43520",
+      "subject": {
+        "id": "aab2ee59-9fcd-4c87-90e5-84462bf0a22c",
+        "label": "EU Agricultural Robotics Projects",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "predicate": "DRIVES",
+      "object": {
+        "id": "c7c43520-929a-42eb-ac5d-170bac55b1ba",
+        "label": "EU Funding for Agricultural Robotic...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "metadata": {
+        "weight": 0.802,
+        "timestamp": "2026-04-14T14:37:26.191513+00:00",
+        "source_url": "https://cordis.europa.eu/search/en?q=agricultural+robotics&p=1&num=5&srt=Relevance:decreasing",
+        "causal_chain": [
+          "TECHNOLOGICAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "d2e387b4_a842c3d0",
+      "subject": {
+        "id": "d2e387b4-ac7d-4291-863d-6b366827aede",
+        "label": "EU Agricultural Machinery Market Up...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "predicate": "DEPENDS_ON",
+      "object": {
+        "id": "a842c3d0-a9f9-4390-9f3a-55a4c59b542a",
+        "label": "EU Agricultural Machinery Market Up...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "metadata": {
+        "weight": 0.879,
+        "timestamp": "2026-04-14T14:37:31.124509+00:00",
+        "source_url": "https://www.agriland.co.uk/farming-news/category/machinery/",
+        "causal_chain": [
+          "TECHNOLOGICAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "d2e387b4_7f395faf",
+      "subject": {
+        "id": "d2e387b4-ac7d-4291-863d-6b366827aede",
+        "label": "EU Agricultural Machinery Market Up...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "predicate": "DECREASES",
+      "object": {
+        "id": "7f395faf-46b2-4f3c-93df-fc6101f4a617",
+        "label": "EU Agricultural Machinery Market Up...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "metadata": {
+        "weight": 0.863,
+        "timestamp": "2026-04-14T14:37:31.124509+00:00",
+        "source_url": "https://www.agriland.co.uk/farming-news/category/machinery/",
+        "causal_chain": [
+          "TECHNOLOGICAL"
+        ],
+        "causal_depth": 0
+      }
+    }
+  ],
   "schema_version": 2
 }

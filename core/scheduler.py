@@ -8,7 +8,7 @@ Architecture
   SchedulerEngine.start()
     → every 6 hours: _run_scout_cycle()
         → scrape each PESTEL_SOURCE
-        → score each article via Gemini
+        → score each article via HuggingFace
         → save to Astra DB
     → every 30 seconds: _heartbeat()
         → update HEALTH dict (alive, last_run, counts)
@@ -69,7 +69,7 @@ HEALTH: dict = {
 def _run_scout_cycle() -> None:
     """
     One full intelligence cycle:
-      scrape all sources → score via Gemini → save to Astra DB.
+      scrape all sources → score via HuggingFace → save to Astra DB.
     Errors per source are caught; they never abort the full cycle.
     """
     from core.scraper      import scrape_source
