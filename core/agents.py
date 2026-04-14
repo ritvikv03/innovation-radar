@@ -2,7 +2,7 @@
 core/agents.py — Fendt PESTEL-EL Sentinel: Multi-Agent Relational Brain
 ========================================================================
 A LangGraph parallel multi-agent framework powered by HuggingFace
-Inference API (meta-llama/Llama-3.2-3B-Instruct).  Zero Anthropic
+Inference API (meta-llama/Llama-3.1-8B-Instruct).  Zero Anthropic
 dependency — all inference runs through the HuggingFace free tier.
 
 Architecture
