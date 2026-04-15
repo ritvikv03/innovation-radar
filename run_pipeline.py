@@ -79,7 +79,7 @@ def _fetch_url(url: str) -> str:
     """Fetch plain text from a URL using only stdlib."""
     req = urllib.request.Request(
         url,
-        headers={"User-Agent": "Mozilla/5.0 (Sentinel/1.0; +https://fendt.com)"},
+        headers={"User-Agent": "Mozilla/5.0 (Sentinel/1.0)"},
     )
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -102,7 +102,7 @@ def _fetch_url(url: str) -> str:
 def _print_results(signal, scored, saved: bool) -> None:
     """Print a rich terminal report of the scored signal."""
 
-    _header("GEMINI SCORING RESULTS")
+    _header("HUGGINGFACE SCORING RESULTS")
 
     print(f"\n  {_c('Title', _BOLD)}     : {signal.title}")
     print(f"  {_c('Dimension', _BOLD)} : {_c(signal.pestel_dimension.value, _PURPLE)}")
@@ -112,7 +112,6 @@ def _print_results(signal, scored, saved: bool) -> None:
     print(f"    Impact   {_score_bar(signal.impact_score)}")
     print(f"    Novelty  {_score_bar(signal.novelty_score)}")
     print(f"    Velocity {_score_bar(signal.velocity_score)}")
-    print(f"    Severity {_score_bar(scored.severity_score)}")
     print(f"    {_c('Disruption (composite)', _BOLD)} = "
           f"{_c(f'{signal.disruption_score:.3f}', _GREEN)}"
           f"  {_c('(Impact×0.5 + Novelty×0.3 + Velocity×0.2)', _DIM)}")
@@ -149,7 +148,7 @@ _INTRO = """
 └─────────────────────────────────────────────────────────────┘
 """
 
-def _interactive_loop(db: SignalDB, save: bool) -> None:
+def _interactive_loop(db: SignalDB | None, save: bool) -> None:
     print(_c(_INTRO, _CYAN))
     while True:
         print(_c("Paste article text below (END on blank line to submit, 'quit' to exit):", _BOLD))
@@ -180,25 +179,29 @@ def _interactive_loop(db: SignalDB, save: bool) -> None:
 def _run_scoring(
     text: str,
     source_url: str | None,
-    db: SignalDB,
+    db: SignalDB | None,
     save: bool,
 ) -> None:
-    # Inject URL into text so the LLM can pick it up for source_url field
+    # Inject URL into text so the LLM can pick it up for the source_url field
     if source_url and source_url not in text:
         text = f"SOURCE: {source_url}\n\n{text}"
 
     print(_c("\n  Sending to HuggingFace for scoring…", _DIM))
 
     try:
-        if save:
-            signal, scored = score_and_save(text, db=db)
+        if save and db is not None:
+            result = score_and_save(text, db=db)
+            if result is None:
+                print(_c("\n  ⏭  Near-duplicate detected — signal already exists in Astra DB. Skipping.", _YELLOW))
+                return
+            signal, scored = result
         else:
             signal, scored = score_text(text)
     except (ValueError, RuntimeError) as exc:
         print(_c(f"\n  ❌  Error: {exc}", _RED))
         return
 
-    _print_results(signal, scored, saved=save)
+    _print_results(signal, scored, saved=(save and db is not None))
 
 
 # ─── CLI entry point ──────────────────────────────────────────────────────────
@@ -206,7 +209,7 @@ def _run_scoring(
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="run_pipeline.py",
-        description="Score a news article or free text for agricultural disruption",
+        description="Score a news article or free text for strategic disruption signals",
     )
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--text", "-t", metavar="TEXT",
@@ -218,7 +221,16 @@ def main() -> None:
     args = parser.parse_args()
 
     save = not args.no_save
-    db   = SignalDB()
+
+    # Only instantiate SignalDB when we actually intend to persist
+    db: SignalDB | None = None
+    if save:
+        try:
+            db = SignalDB()
+        except RuntimeError as exc:
+            print(_c(f"\n  ❌  DB init failed: {exc}", _RED))
+            print(_c("  Continuing in dry-run mode (--no-save).", _YELLOW))
+            save = False
 
     if args.url:
         print(_c(f"\n  Fetching: {args.url}", _DIM))

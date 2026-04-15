@@ -86,6 +86,8 @@ class Signal(BaseModel):
 | Knowledge graph | `data/graph.json` (rebuilt each cycle by `graph_engine.py`) |
 | Dashboard cache | `SummaryEngine.get_latest()` — never re-hit the LLM on page reload |
 
+**Astra DB endpoint** is read from the `ASTRA_DB_ENDPOINT` environment variable at runtime. It is never hard-coded. Both `ASTRA_DB_TOKEN` and `ASTRA_DB_ENDPOINT` must be set or `SignalDB()` raises `RuntimeError` on instantiation.
+
 **Rules:**
 - All reads/writes go through `SignalDB` in `core/database.py`. Never call Astra DB directly from app code.
 - SQLite is legitimate for summary caching only (`SummaryEngine`). Do not use it for signals.

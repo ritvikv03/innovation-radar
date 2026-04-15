@@ -16,9 +16,9 @@ from __future__ import annotations
 #   url          — direct article / RSS / API endpoint
 #   dimension    — one of the 6 PESTEL values
 #   source_name  — short human-readable label
-#   scrape_mode  — "rss"  → parse XML feed (multiple articles)
-#                  "page" → scrape single page (Firecrawl)
-#                  "api"  → JSON REST endpoint (custom handler)
+#   scrape_mode  — "rss"         → parse XML feed (multiple articles)
+#                  "page"        → scrape single page (Firecrawl / requests)
+#                  "api_ec_press"→ EC Press Releases JSON REST endpoint
 
 PESTEL_SOURCES: list[dict] = [
     # ── POLITICAL ──────────────────────────────────────────────
@@ -41,6 +41,12 @@ PESTEL_SOURCES: list[dict] = [
         "dimension":   "ECONOMIC",
         "source_name": "Eurostat Agricultural Price Indices",
         "scrape_mode": "page",
+    },
+    {
+        "url":         "https://feeds.feedburner.com/euractiv/agriculture",
+        "dimension":   "ECONOMIC",
+        "source_name": "Euractiv Agriculture RSS",
+        "scrape_mode": "rss",
     },
 
     # ── LEGAL ──────────────────────────────────────────────────

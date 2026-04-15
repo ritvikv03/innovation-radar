@@ -12,8 +12,9 @@ Flow
 
 Public API
 ----------
-  score_text(text)        → Signal
-  score_and_save(text, db) → Signal   (also persists to Astra DB)
+  score_text(text)         → (Signal, LLMScoreResponse)
+  score_and_save(text, db) → Optional[(Signal, LLMScoreResponse)]
+                             Returns None when the text is a near-duplicate.
 """
 
 from __future__ import annotations
@@ -58,7 +59,7 @@ class LLMScoreResponse(BaseModel):
     )
     content: str = Field(
         ..., min_length=20,
-        description="2–4 sentence synthesis of the article's key agricultural disruption"
+        description="2–4 sentence synthesis of the signal's strategic disruption relevance"
     )
     source_url: str = Field(
         default="https://unknown-source.placeholder",
@@ -112,17 +113,19 @@ class LLMScoreResponse(BaseModel):
 
 
 # ─── Prompt ───────────────────────────────────────────────────────────────────
+# Universal strategic prompt — no company-specific copy (sponsor requirement #3).
 
 _SYSTEM_PROMPT = textwrap.dedent("""\
-    You are an expert agricultural market intelligence analyst working for Fendt (AGCO).
-    Your job is to score incoming text signals for their strategic disruption relevance
-    to the EU agricultural machinery market.
+    You are an expert macro-environmental intelligence analyst specialising in
+    strategic disruption signals. Your job is to score incoming text signals for
+    their strategic relevance across the PESTEL framework.
 
     SCORING RUBRIC:
-    - impact_score (0–1): How severely could this disrupt Fendt's market, supply chain,
-      or competitive position? 0=no impact, 1=existential threat or major opportunity.
-    - novelty_score (0–1): How surprising or new is this information relative to known
-      EU agricultural trends? 0=widely known, 1=completely new signal.
+    - impact_score (0–1): How severely could this disrupt an organisation's market,
+      supply chain, or competitive position? 0=no impact, 1=existential threat or
+      major opportunity.
+    - novelty_score (0–1): How surprising or new is this information relative to
+      established trends? 0=widely known, 1=completely new signal.
     - velocity_score (0–1): How fast is this situation evolving? Consider regulatory
       timelines, market adoption curves, and urgency of decision-making. 0=slow/stable,
       1=requires immediate board attention.
@@ -179,14 +182,18 @@ def _extract_json(raw: str) -> str:
     return candidate
 
 
-_DEDUP_THRESHOLD = 0.08   # cosine distance; lower = more similar. Tune here.
+# Cosine distance threshold for near-duplicate detection.
+# Astra returns distance = 1.0 − similarity, so range is [0.0, 1.0].
+# A threshold of 0.08 catches rephrased duplicates of the same article
+# while allowing genuinely new signals through.
+_DEDUP_THRESHOLD = 0.08
 
 
 def _is_duplicate(text: str, db: SignalDB) -> bool:
     """
     Return True if Astra DB already contains a semantically near-identical document.
 
-    Uses cosine distance (range 0–2, lower = more similar).
+    Uses cosine distance in [0.0, 1.0] (lower = more similar).
     A threshold of 0.08 catches rephrased duplicates of the same article
     while allowing genuinely new signals through.
     """
@@ -208,7 +215,7 @@ def _call_llm(text: str, max_input_chars: int = 8_000) -> LLMScoreResponse:
     parse the JSON scoring response.
 
     Uses the `conversational` task (chat_completion), which works across
-    all HuggingFace inference providers including novita.
+    all HuggingFace inference providers including Cerebras.
 
     Raises
     ------
