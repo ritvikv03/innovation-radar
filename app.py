@@ -652,7 +652,7 @@ def _tab_feed() -> html.Div:
         return html.Tr([
             html.Td(s.date_ingested.strftime("%Y-%m-%d")),
             html.Td(html.Span(_DIM_PILL_CODE.get(s.pestel_dimension.value, "?"),
-                              className=f"dim-pill dim-{s.pestel_dimension.value.lower()}")),
+                              className=f"dim-pill dp-{_DIM_PILL_CODE.get(s.pestel_dimension.value, 'P')}")),
             html.Td(html.Div([
                 html.Div(s.title, style={"fontWeight": "600", "color": "#e8edf5"}),
                 html.Div(s.content[:140] + "...", style={"fontSize": "11px", "color": "#7d8fa8"}),
@@ -1481,7 +1481,33 @@ app = dash.Dash(
     suppress_callback_exceptions=True,
     title="Fendt Sentinel",
     background_callback_manager=_background_manager,
+    meta_tags=[
+        {"name": "viewport", "content": "width=device-width, initial-scale=1"},
+        {"charset": "utf-8"},
+    ],
 )
+
+# Bootstrap 5.3 (used by DBC 2.x) requires data-bs-theme="dark" on <html>
+# for components to render in dark mode. Without this, cards/inputs/dropdowns
+# render with white backgrounds (Bootstrap's default light theme).
+app.index_string = """<!DOCTYPE html>
+<html data-bs-theme="dark">
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        {%favicon%}
+        {%css%}
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>
+"""
 server = app.server
 
 # ── Flask-Caching — memoize expensive DB + graph calls ────────
