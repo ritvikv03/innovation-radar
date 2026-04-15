@@ -113,12 +113,12 @@ html, body {
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--mid);
+  color: #ffffff;
   margin-bottom: 10px;
 }
 
 .sb-kpi        { padding: 6px 0; }
-.sb-kpi-label  { font-size: 9.5px; color: var(--mid); text-transform: uppercase; letter-spacing: 0.08em; }
+.sb-kpi-label  { font-size: 9.5px; color: var(--hi); text-transform: uppercase; letter-spacing: 0.08em; }
 .sb-kpi-value  {
   font-family: var(--mono);
   font-size: 26px;
@@ -333,7 +333,7 @@ html, body {
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--mid);
+  color: #ffffff;
   margin-bottom: 18px;
 }
 .card-title {
@@ -348,7 +348,7 @@ html, body {
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--mid);
+  color: #ffffff;
   margin-bottom: 8px;
 }
 .kpi-value {
@@ -361,7 +361,7 @@ html, body {
 }
 .kpi-sub {
   font-size: 10.5px;
-  color: var(--mid);
+  color: var(--hi);
   margin-top: 7px;
 }
 
@@ -398,7 +398,7 @@ html, body {
 
 .feed-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
 .feed-title  { font-size: 12.5px; font-weight: 600; color: var(--hi); line-height: 1.4; margin-bottom: 4px; }
-.feed-meta   { font-size: 10px; color: var(--mid); }
+.feed-meta   { font-size: 10px; color: var(--hi); }
 .feed-score  { font-family: var(--mono); font-size: 10px; color: var(--amber); }
 
 /* ── 13. PESTEL Dimension Pills ────────────────────────────────── */
@@ -575,7 +575,7 @@ html, body {
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--mid);
+  color: #ffffff;
   margin-bottom: 6px;
   margin-top: 14px;
 }

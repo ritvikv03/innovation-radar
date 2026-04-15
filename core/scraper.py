@@ -66,15 +66,21 @@ def _scrape_rss(url: str) -> list[ScrapedArticle]:
     # Support both RSS <item> and Atom <entry>
     for tag in ("item", "{http://www.w3.org/2005/Atom}entry"):
         for item in root.iter(tag):
-            title_el   = item.find("title") or item.find("{http://www.w3.org/2005/Atom}title")
-            desc_el    = item.find("description") or item.find("{http://www.w3.org/2005/Atom}summary")
-            link_el    = item.find("link") or item.find("{http://www.w3.org/2005/Atom}link")
+            title_el   = item.find("title")
+            if title_el is None:
+                title_el = item.find("{http://www.w3.org/2005/Atom}title")
+            desc_el    = item.find("description")
+            if desc_el is None:
+                desc_el = item.find("{http://www.w3.org/2005/Atom}summary")
+            link_el    = item.find("link")
+            if link_el is None:
+                link_el = item.find("{http://www.w3.org/2005/Atom}link")
             content_el = item.find("content:encoded", _RSS_NAMESPACES)
 
-            title   = (title_el.text   or "").strip()  if title_el   else ""
-            desc    = (desc_el.text    or "").strip()  if desc_el    else ""
-            content = (content_el.text or "").strip()  if content_el else ""
-            link    = (link_el.text    or link_el.get("href", "")) if link_el else url
+            title   = (title_el.text   or "").strip()  if title_el   is not None else ""
+            desc    = (desc_el.text    or "").strip()  if desc_el    is not None else ""
+            content = (content_el.text or "").strip()  if content_el is not None else ""
+            link    = (link_el.text    or link_el.get("href", "")) if link_el is not None else url
 
             # Strip HTML tags from content
             import re

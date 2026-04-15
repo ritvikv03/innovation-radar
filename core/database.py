@@ -18,7 +18,7 @@ Architecture
 Similarity convention
 ---------------------
   Astra returns `$similarity` in [0.0, 1.0] (higher = more similar).
-  All existing call sites expect ChromaDB-style distance (lower = more
+  All existing call sites expect distance semantics (lower = more
   similar). SignalDB.search() converts: distance = 1.0 − similarity.
 
 Environment
@@ -340,7 +340,7 @@ class SignalDB:
         -------
         List of (Signal, distance) tuples, sorted by distance ascending
         (lower = more similar).  Distance = 1.0 − Astra similarity score,
-        preserving the ChromaDB convention used throughout the codebase.
+        preserving distance-ascending semantics used throughout the codebase.
         """
         filter_: dict = {}
         if dimension_filter:

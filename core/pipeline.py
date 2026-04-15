@@ -186,7 +186,7 @@ def _is_duplicate(text: str, db: SignalDB) -> bool:
     """
     Return True if Astra DB already contains a semantically near-identical document.
 
-    Uses cosine distance from ChromaDB (range 0–2, lower = more similar).
+    Uses cosine distance (range 0–2, lower = more similar).
     A threshold of 0.08 catches rephrased duplicates of the same article
     while allowing genuinely new signals through.
     """

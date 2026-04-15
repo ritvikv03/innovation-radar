@@ -118,7 +118,7 @@ _DIM_PILL_CODE = {
     "TECHNOLOGICAL": "T", "ENVIRONMENTAL": "En", "LEGAL": "L",
 }
 
-_SEV_COLOUR = {"critical": "#ff1744", "high": "#ffab00", "moderate": "#00e5ff", "low": "#3d4f62"}
+_SEV_COLOUR = {"critical": "#ff1744", "high": "#ffab00", "moderate": "#00e5ff", "low": "#607d8b"}
 
 
 def _hex_to_rgba(hex_colour: str, alpha: float = 0.30) -> str:
@@ -141,7 +141,7 @@ _CHART_BASE = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
     font_family="Inter, -apple-system, system-ui, sans-serif",
-    font_color="#7d8fa8",
+    font_color="#a8bcd0",
     margin=dict(l=36, r=16, t=44, b=36),
     hoverlabel=dict(
         bgcolor="rgba(6,8,13,0.97)",
@@ -156,16 +156,16 @@ _AXIS_Y = dict(
     gridcolor="rgba(255,255,255,0.04)",
     zerolinecolor="rgba(255,255,255,0.06)",
     showline=False,
-    tickfont=dict(size=10, color="#3d4f62"),
+    tickfont=dict(size=10, color="#6a8099"),
 )
 _AXIS_X = dict(
     gridcolor="rgba(0,0,0,0)",
     zerolinecolor="rgba(0,0,0,0)",
     showline=False,
-    tickfont=dict(size=10, color="#3d4f62"),
+    tickfont=dict(size=10, color="#6a8099"),
 )
 _AXIS_NONE = dict(showgrid=False, zeroline=False, showline=False,
-                  tickfont=dict(size=10, color="#3d4f62"))
+                  tickfont=dict(size=10, color="#6a8099"))
 
 
 # ─────────────────────────────────────────────────────────────
@@ -261,7 +261,7 @@ def _chart_histogram(signals: list[Signal]) -> go.Figure:
         fig.add_annotation(
             text="No signals yet — run the Scout pipeline.",
             x=0.5, y=0.5, xref="paper", yref="paper",
-            showarrow=False, font=dict(size=12, color="#7d8fa8"),
+            showarrow=False, font=dict(size=12, color="#a8bcd0"),
         )
     else:
         for dim, col in _DIM_COLOUR.items():
@@ -279,7 +279,7 @@ def _chart_histogram(signals: list[Signal]) -> go.Figure:
         barmode="stack",
         title=dict(
             text=f"Disruption Distribution · {len(signals)} signals",
-            font_size=11, x=0.5, xanchor="center", y=0.96, font_color="#c4d2de",
+            font_size=11, x=0.5, xanchor="center", y=0.96, font_color="#ffffff",
         ),
         xaxis=dict(title="", **_AXIS_X),
         yaxis=dict(title="Signals", **_AXIS_Y),
@@ -318,7 +318,7 @@ def _chart_radar(signals: list[Signal],
         fig.add_annotation(
             text="No signals at this threshold. Lower the filter or run the Scout.",
             x=18, y=0.5, showarrow=False,
-            font=dict(size=13, color="#3d4f62"),
+            font=dict(size=13, color="#6a8099"),
         )
     else:
         for dim, col in _DIM_COLOUR.items():
@@ -556,7 +556,7 @@ def _urgency_matrix(signals: list[Signal]) -> html.Div:
             html.Div("URGENCY MATRIX — 12M CRITICAL", className="section-label"),
             html.Div(
                 "No critical signals (score ≥ 0.75). Run the Scout to ingest intelligence.",
-                style={"fontSize": "12px", "color": "#7d8fa8"},
+                style={"fontSize": "12px", "color": "#e8edf5"},
             ),
         ], className="mb-4")
 
@@ -618,7 +618,7 @@ def _tab_overview() -> html.Div:
                 html.Div("TOP SIGNALS — HIGH + CRITICAL", className="section-label"),
                 *([_feed_card(s) for s in top3] if top3 else [
                     html.P("No signals yet. Run the Scout.",
-                           style={"color": "#7d8fa8", "fontSize": "12px"}),
+                           style={"color": "#e8edf5", "fontSize": "12px"}),
                 ]),
             ], className="war-card"), md=6),
         ], className="g-3"),
@@ -643,7 +643,7 @@ def _tab_radar() -> html.Div:
                     html.Div(style={"width": "10px", "height": "10px", "borderRadius": "50%",
                                     "background": col, "flexShrink": "0",
                                     "boxShadow": f"0 0 6px {col}"}),
-                    html.Span(f"{ring} — {lbl}", style={"fontSize": "11px", "color": "#7d8fa8"}),
+                    html.Span(f"{ring} — {lbl}", style={"fontSize": "11px", "color": "#ffffff"}),
                 ], style={"display": "flex", "alignItems": "center", "gap": "8px", "marginBottom": "7px"})
                   for ring, lbl, col in [
                       ("12M", "CRITICAL · Immediate",     "#ff1744"),
@@ -674,7 +674,7 @@ def _tab_radar() -> html.Div:
                 ),
                 html.Div(
                     "Default shows HIGH + CRITICAL only (≥ 0.50)",
-                    style={"fontSize": "9.5px", "color": "#7d8fa8", "marginTop": "8px"},
+                    style={"fontSize": "9.5px", "color": "#ffffff", "marginTop": "8px"},
                 ),
             ], className="war-card"), md=3),
         ], className="g-3"),
@@ -691,12 +691,12 @@ def _tab_feed() -> html.Div:
             dbc.Col([
                 html.Div(
                     f"{len(signals)} signal(s) · sorted newest first · live from Astra DB",
-                    style={"fontSize": "11px", "color": "#7d8fa8", "marginBottom": "16px"},
+                    style={"fontSize": "11px", "color": "#e8edf5", "marginBottom": "16px"},
                 ),
                 html.Div(
                     [_feed_card(s) for s in signals] if signals else [
                         html.P("No signals. Run the Scout to ingest data.",
-                               style={"color": "#7d8fa8", "fontSize": "12px"}),
+                               style={"color": "#e8edf5", "fontSize": "12px"}),
                     ],
                 ),
             ], md=8),
@@ -778,9 +778,9 @@ def _tab_chatbot(history: list[dict] | None = None) -> html.Div:
                 html.Div("MODEL", className="section-label"),
                 html.Div(_HF_REPO_ID,
                          style={"fontFamily": "JetBrains Mono, monospace",
-                                "fontSize": "10px", "color": "#7d8fa8"}),
+                                "fontSize": "10px", "color": "#e8edf5"}),
                 html.Div("Universal Strategic Analysis",
-                         style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "4px"}),
+                         style={"fontSize": "10px", "color": "#e8edf5", "marginTop": "4px"}),
             ], className="war-card"), md=4),
         ], className="g-3"),
     ])
@@ -879,7 +879,7 @@ def _render_causal_chains() -> list:
     if not chains:
         return [html.Div(
             "No cascade chains yet — chains build as signals relate to each other.",
-            style={"fontSize": "9px", "color": "#7d8fa8", "lineHeight": "1.6"},
+            style={"fontSize": "9px", "color": "#e8edf5", "lineHeight": "1.6"},
         )]
     items = []
     for c in chains:
@@ -890,7 +890,7 @@ def _render_causal_chains() -> list:
         items.append(html.Div([
             html.Div(
                 f"depth {c['depth']}  ·  {c['predicate']}",
-                style={"fontSize": "9px", "color": "#7d8fa8", "fontFamily": "JetBrains Mono, monospace"},
+                style={"fontSize": "9px", "color": "#e8edf5", "fontFamily": "JetBrains Mono, monospace"},
             ),
             html.Div(
                 dangerously_allow_html=True,
@@ -919,7 +919,7 @@ def _render_inferred_relationships() -> list:
     if not inferred:
         return [html.Div(
             "No inferred cascades yet — click 'Run Inference' to surface hidden cross-PESTEL relationships.",
-            style={"fontSize": "9px", "color": "#7d8fa8", "lineHeight": "1.6"},
+            style={"fontSize": "9px", "color": "#e8edf5", "lineHeight": "1.6"},
         )]
 
     items = []
@@ -945,7 +945,7 @@ def _render_inferred_relationships() -> list:
             ),
             html.Div(
                 f"{subj[:28]} → {obj[:28]}",
-                style={"fontSize": "9px", "color": "#7d8fa8", "marginTop": "2px"},
+                style={"fontSize": "9px", "color": "#e8edf5", "marginTop": "2px"},
             ),
         ], style={"marginBottom": "8px", "paddingLeft": "4px",
                   "borderLeft": "2px solid rgba(0,229,255,0.15)"}))
@@ -971,7 +971,7 @@ def _tab_graph() -> html.Div:
             style={"fontSize": "10px"},
         ),
         html.Div(id="graph-action-status",
-                 style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "6px"}),
+                 style={"fontSize": "10px", "color": "#e8edf5", "marginTop": "6px"}),
     ], style={"marginBottom": "12px"})
 
     if node_count == 0:
@@ -998,7 +998,7 @@ def _tab_graph() -> html.Div:
                     _metric("Edges", "—"),
                     html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
                     html.Div("Run the Scout to generate graph data.",
-                             style={"fontSize": "10px", "color": "#7d8fa8", "lineHeight": "1.6"}),
+                             style={"fontSize": "10px", "color": "#e8edf5", "lineHeight": "1.6"}),
                 ], className="war-card"), md=3),
             ], className="g-3"),
         ])
@@ -1048,7 +1048,7 @@ def _tab_graph() -> html.Div:
                          style={"fontFamily": "JetBrains Mono, monospace",
                                 "fontSize": "10px", "color": "#e8edf5"}),
                 html.Div("Click a node to inspect · Drag to explore",
-                         style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "6px"}),
+                         style={"fontSize": "10px", "color": "#e8edf5", "marginTop": "6px"}),
             ], className="war-card"), md=3),
         ], className="g-3"),
     ])
@@ -1111,10 +1111,10 @@ def _render_report_body(path: str | None) -> html.Div:
                 html.Div(doc_class, className="report-classification"),
                 html.Div(doc_title, className="report-title"),
                 html.Div([
-                    html.Span("Generated: ", style={"color": "#7d8fa8"}),
-                    html.Span(doc_date or "—", style={"color": "#7d8fa8"}),
+                    html.Span("Generated: ", style={"color": "#e8edf5"}),
+                    html.Span(doc_date or "—", style={"color": "#e8edf5"}),
                     html.Span("  ·  Source: Fendt PESTEL-EL Sentinel",
-                              style={"color": "#7d8fa8"}),
+                              style={"color": "#e8edf5"}),
                 ], className="report-meta"),
             ], className="report-doc-header-left"),
         ], className="report-doc-header"),
@@ -1192,7 +1192,7 @@ def _tab_reports() -> html.Div:
 
                 # ── Generation status ───────────────────────────
                 html.Div("", id="reports-gen-status",
-                         style={"fontSize": "11px", "color": "#7d8fa8",
+                         style={"fontSize": "11px", "color": "#e8edf5",
                                 "marginBottom": "16px", "minHeight": "18px"}),
 
                 # ── Report body ─────────────────────────────────
@@ -1218,7 +1218,7 @@ def _tab_reports() -> html.Div:
                 html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
                 html.Div(
                     "Place .md files in outputs/reports/ to register them here.",
-                    style={"fontSize": "9px", "color": "#7d8fa8", "lineHeight": "1.6"},
+                    style={"fontSize": "9px", "color": "#e8edf5", "lineHeight": "1.6"},
                 ),
             ], className="war-card"), md=2),
         ], className="g-3"),
@@ -1317,7 +1317,7 @@ def _run_lens_search(topic: str | None, custom: str | None = None) -> html.Div:
 
     header = html.Div(
         f'{len(results)} signal(s) matched · query: "{query}"',
-        style={"fontSize": "10px", "color": "#7d8fa8",
+        style={"fontSize": "10px", "color": "#e8edf5",
                "fontFamily": "JetBrains Mono, monospace", "marginBottom": "14px"},
     )
     return html.Div([header, *[_lens_signal_card(sig, score) for sig, score in results]])
@@ -1368,7 +1368,7 @@ def _tab_lens() -> html.Div:
                 html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
                 html.Div("TIP", className="section-label"),
                 html.Div('Select "Custom Search…" and type any free-form topic.',
-                         style={"fontSize": "9.5px", "color": "#7d8fa8", "lineHeight": "1.6"}),
+                         style={"fontSize": "9.5px", "color": "#e8edf5", "lineHeight": "1.6"}),
             ], className="war-card"), md=3),
         ], className="g-3"),
     ])
@@ -1414,7 +1414,11 @@ _flask_cache = _FlaskCache(
 @_flask_cache.memoize(timeout=30)
 def _get_all_signals_cached() -> list:
     """Cached get_all() — avoids hitting Astra DB on every tab render."""
-    return _get_db().get_all()
+    try:
+        return _get_db().get_all()
+    except Exception as exc:
+        log.error("_get_all_signals_cached failed: %s", exc)
+        return []
 
 
 @_flask_cache.memoize(timeout=30)

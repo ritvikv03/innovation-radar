@@ -5,7 +5,7 @@ Usage:
     from core.logger import get_logger
     log = get_logger(__name__)
     log.info("Pipeline started")
-    log.warning("Gemini quota low")
+    log.warning("HuggingFace quota low")
     log.error("Astra DB unreachable: %s", exc)
 
 All log records go to:

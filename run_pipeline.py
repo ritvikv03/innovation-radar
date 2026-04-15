@@ -2,8 +2,8 @@
 """
 run_pipeline.py — Fendt PESTEL-EL Sentinel: Interactive CLI
 ============================================================
-Score a news article or free text via Gemini, validate with
-Pydantic, and save the result to ChromaDB.
+Score a news article or free text via HuggingFace, validate with
+Pydantic, and save the result to Astra DB.
 
 Usage
 -----
@@ -133,7 +133,7 @@ def _print_results(signal, scored, saved: bool) -> None:
 
     print(f"\n  {_c('Source URL', _BOLD)}: {signal.source_url}")
 
-    status = _c("✅  Saved to ChromaDB", _GREEN) if saved else _c("⚠️  Dry-run (not saved)", _YELLOW)
+    status = _c("✅  Saved to Astra DB", _GREEN) if saved else _c("⚠️  Dry-run (not saved)", _YELLOW)
     print(f"\n  {status}")
     print(_c("─" * 65, _DIM))
     print()
@@ -183,11 +183,11 @@ def _run_scoring(
     db: SignalDB,
     save: bool,
 ) -> None:
-    # Inject URL into text so Gemini can pick it up for source_url field
+    # Inject URL into text so the LLM can pick it up for source_url field
     if source_url and source_url not in text:
         text = f"SOURCE: {source_url}\n\n{text}"
 
-    print(_c("\n  Sending to Gemini for scoring…", _DIM))
+    print(_c("\n  Sending to HuggingFace for scoring…", _DIM))
 
     try:
         if save:
@@ -214,7 +214,7 @@ def main() -> None:
     group.add_argument("--url", "-u", metavar="URL",
                        help="Fetch a web page and score its content")
     parser.add_argument("--no-save", action="store_true",
-                        help="Dry-run: score but do NOT write to ChromaDB")
+                        help="Dry-run: score but do NOT write to Astra DB")
     args = parser.parse_args()
 
     save = not args.no_save

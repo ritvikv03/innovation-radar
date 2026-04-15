@@ -88,10 +88,10 @@ class SummaryEngine:
             String with ``{key}`` placeholders matching keys in
             ``context_data``.
         fallback_fn:
-            ``callable(context_data) -> str`` used when Gemini is
+            ``callable(context_data) -> str`` used when HuggingFace is
             unavailable or quota is exhausted.
         max_tokens:
-            Max output tokens for the Gemini call.
+            Max output tokens for the HuggingFace call.
         persist:
             If ``True``, save the result to SQLite (default).
 
