@@ -1,3 +1,12 @@
+---
+title: Fendt Sentinel
+emoji: 🚜
+colorFrom: cyan
+colorTo: blue
+sdk: docker
+pinned: false
+---
+
 # Fendt PESTEL-EL Sentinel
 
 **Autonomous Strategic Intelligence for AGCO/Fendt**

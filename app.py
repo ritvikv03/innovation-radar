@@ -2061,5 +2061,7 @@ if __name__ == "__main__":
     print(f"  Scheduler: active (6-hour scout cycle)")
     print(f"  Auto-refresh: 30 seconds\n")
 
-    app.run(debug=False, host="0.0.0.0", port=8050)
+    # Use PORT env var (Hugging Face / Render) or default to 7860
+    port = int(os.environ.get("PORT", 7860))
+    app.run(debug=False, host="0.0.0.0", port=port)
     _scheduler_engine.stop()
