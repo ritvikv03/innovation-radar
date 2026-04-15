@@ -1741,7 +1741,7 @@ def update_radar(dim_filter: str, min_score: float, _i: int, _n: int) -> go.Figu
 def update_sidebar(_i: int, _n: int):
     stats    = _db_stats_cached()
     total    = stats["total"]
-    by_dim   = stats.get("by_dimension", {})
+    by_dim   = stats.get("by_dim", {})
 
     db_kind    = "live" if total else "idle"
     gem_kind   = "live" if _HF_OK else "warn"

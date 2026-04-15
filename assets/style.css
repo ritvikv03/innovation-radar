@@ -163,8 +163,8 @@ html, body {
   padding: 14px 20px;
   border-top: 1px solid var(--card-border);
   font-family: var(--mono);
-  font-size: 9px;
-  color: var(--mid);
+  font-size: 9.5px;
+  color: #8a9bb5;
   line-height: 2;
 }
 
