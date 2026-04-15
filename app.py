@@ -51,7 +51,7 @@ except ImportError:
 import numpy as np
 import plotly.graph_objects as go
 from dash import Input, Output, State, callback_context, dcc, html, no_update
-from dash.long_callback import DiskcacheLongCallbackManager
+from dash import DiskcacheManager
 
 # ── Load .env ─────────────────────────────────────────────────
 try:
@@ -1465,7 +1465,7 @@ def _tab_lens() -> html.Div:
 _CACHE_DIR = Path(__file__).parent / "data" / ".dash_cache"
 _CACHE_DIR.mkdir(parents=True, exist_ok=True)
 _disk_cache = diskcache.Cache(str(_CACHE_DIR))
-_long_callback_manager = DiskcacheLongCallbackManager(_disk_cache)
+_background_manager = DiskcacheManager(_disk_cache)
 
 app = dash.Dash(
     __name__,
@@ -1476,7 +1476,7 @@ app = dash.Dash(
     ],
     suppress_callback_exceptions=True,
     title="Fendt Sentinel",
-    long_callback_manager=_long_callback_manager,
+    background_callback_manager=_background_manager,
 )
 server = app.server
 
@@ -1764,7 +1764,7 @@ def update_sidebar(_i: int, _n: int):
     return body, badge, ts
 
 
-@app.long_callback(
+@app.callback(
     output=[
         Output("chat-messages", "children"),
         Output("chat-store",    "data"),
@@ -1788,6 +1788,7 @@ def update_sidebar(_i: int, _n: int):
         (Output("chat-input", "disabled"), True, False),
     ],
     prevent_initial_call=True,
+    background=True,
 )
 def send_message(n_send, n_sub, c0, c1, c2, c3, c4, question_val, history_data):
     chip_texts = [
@@ -1978,7 +1979,7 @@ def export_report_pdf(n_clicks: int, current_path: str | None, last_path: str | 
 
 # ── Generate Intelligence Brief callback (background) ─────────
 
-@app.long_callback(
+@app.callback(
     output=[
         Output("reports-dropdown",   "options"),
         Output("reports-dropdown",   "value"),
@@ -1995,6 +1996,7 @@ def export_report_pdf(n_clicks: int, current_path: str | None, last_path: str | 
         ),
     ],
     prevent_initial_call=True,
+    background=True,
 )
 def generate_intelligence_brief(n_clicks: int):
     """Fetch top 10 signals, call generate_brief_markdown, write .md, refresh dropdown.
