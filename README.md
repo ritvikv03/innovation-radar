@@ -1,7 +1,7 @@
 ---
 title: Fendt Sentinel
 emoji: 🚜
-colorFrom: cyan
+colorFrom: blue
 colorTo: blue
 sdk: docker
 pinned: false
