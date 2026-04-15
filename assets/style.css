@@ -631,139 +631,110 @@ html, body {
 
 /* ── 20. DCC Dropdown — Forced Dark Theme ──────────────────────── */
 /*
- * dcc.Dropdown in Dash 4.x uses VirtualizedSelect / React-Select internals.
- * Bootstrap 5.3 data-bs-theme=dark does NOT reach these React components.
- * We target every internal class with .dark-dropdown parent selector so
- * only our dropdowns are affected (not any DBC native dropdowns).
+ * Aggressive overrides to fight Hugging Face / Default browser themes.
+ * Targets the .Select-control (box) and .Select-menu (dropdown list).
  */
 
-.dark-dropdown .Select-control {
-  background: #0f1623 !important;
-  border: 1px solid rgba(255,255,255,0.12) !important;
+/* The main box */
+.dark-dropdown .Select-control,
+.Select-control {
+  background-color: #0d1117 !important;
+  background: #0d1117 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: 8px !important;
-  min-height: 36px !important;
-  box-shadow: none !important;
-  cursor: pointer !important;
-}
-.dark-dropdown .Select-control:hover {
-  border-color: rgba(0,229,255,0.4) !important;
-}
-.dark-dropdown.is-focused .Select-control,
-.dark-dropdown .Select--is-focused .Select-control {
-  border-color: #00e5ff !important;
-  box-shadow: 0 0 0 2px rgba(0,229,255,0.12) !important;
+  min-height: 38px !important;
 }
 
-/* Selected value / placeholder */
-.dark-dropdown .Select-value-label { color: #e8edf5 !important; font-size: 12.5px !important; }
-.dark-dropdown .Select-value        { color: #e8edf5 !important; }
-.dark-dropdown .Select-placeholder  { color: #6a8099 !important; font-size: 12px !important; }
-
-/* Chevron */
-.dark-dropdown .Select-arrow-zone { padding-right: 10px !important; }
-.dark-dropdown .Select-arrow      { border-top-color: #6a8099 !important; }
-
-/* Search input inside dropdown */
-.dark-dropdown .Select-input > input,
-.dark-dropdown input {
+/* The selected text */
+.dark-dropdown .Select-value-label,
+.Select-value-label {
   color: #e8edf5 !important;
-  background: transparent !important;
-  font-size: 12px !important;
+  font-size: 13px !important;
 }
 
-/* Dropdown menu */
-.dark-dropdown .Select-menu-outer {
-  background: #131922 !important;
-  border: 1px solid rgba(255,255,255,0.1) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
-  z-index: 9999 !important;
-  margin-top: 3px !important;
+/* Placeholder text */
+.dark-dropdown .Select-placeholder,
+.Select-placeholder {
+  color: #6a8099 !important;
 }
-.dark-dropdown .Select-menu { background: transparent !important; }
+
+/* Dropdown Menu (The list that opens) */
+.dark-dropdown .Select-menu-outer,
+.Select-menu-outer {
+  background-color: #131922 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6) !important;
+  z-index: 1000 !important;
+}
 
 /* Menu options */
-.dark-dropdown .VirtualizedSelectOption,
-.dark-dropdown .Select-option {
+.dark-dropdown .Select-option,
+.Select-option {
+  background-color: transparent !important;
   color: #a8bcd0 !important;
-  background: transparent !important;
-  font-size: 12px !important;
-  padding: 9px 14px !important;
-  cursor: pointer !important;
 }
-.dark-dropdown .VirtualizedSelectFocusedOption,
+
 .dark-dropdown .Select-option.is-focused,
-.dark-dropdown .VirtualizedSelectOption:hover,
-.dark-dropdown .Select-option:hover {
-  color: #e8edf5 !important;
-  background: rgba(255,255,255,0.06) !important;
+.Select-option.is-focused {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
 }
-.dark-dropdown .VirtualizedSelectSelectedOption,
-.dark-dropdown .Select-option.is-selected {
+
+.dark-dropdown .Select-option.is-selected,
+.Select-option.is-selected {
+  background-color: rgba(0, 229, 255, 0.1) !important;
   color: #00e5ff !important;
-  background: rgba(0,229,255,0.08) !important;
-  font-weight: 600 !important;
 }
 
 /* ── DCC Slider — Dark Theme ───────────────────────────────────── */
-.dark-slider { padding: 6px 0 28px !important; }
+.dark-slider,
+.rc-slider {
+  padding: 6px 0 28px !important;
+}
 
-.dark-slider .rc-slider-rail {
-  background: rgba(255,255,255,0.1) !important;
-  height: 4px !important;
+.rc-slider-rail {
+  background: rgba(255, 255, 255, 0.12) !important;
 }
-.dark-slider .rc-slider-track {
+
+.rc-slider-track {
   background: #00e5ff !important;
-  height: 4px !important;
 }
-.dark-slider .rc-slider-handle {
-  width: 16px !important;
-  height: 16px !important;
-  margin-top: -6px !important;
+
+.rc-slider-handle {
   border: 2px solid #00e5ff !important;
-  background: #0d1117 !important;
-  box-shadow: 0 0 0 3px rgba(0,229,255,0.2) !important;
+  background-color: #0d1117 !important;
   opacity: 1 !important;
 }
-.dark-slider .rc-slider-handle:hover,
-.dark-slider .rc-slider-handle:active {
-  border-color: #00e5ff !important;
-  box-shadow: 0 0 0 5px rgba(0,229,255,0.25) !important;
-}
-.dark-slider .rc-slider-dot {
-  background: rgba(255,255,255,0.1) !important;
-  border-color: rgba(255,255,255,0.1) !important;
-}
-.dark-slider .rc-slider-dot-active {
-  background: rgba(0,229,255,0.3) !important;
-  border-color: #00e5ff !important;
-}
+
+/* Slider Marks (The numbers below the slider) */
+.rc-slider-mark-text,
 .dark-slider .rc-slider-mark-text {
-  color: #6a8099 !important;
-  font-size: 10px !important;
-  font-family: "JetBrains Mono", monospace !important;
-}
-
-/* Slider floating tooltip */
-.rc-slider-tooltip-inner {
-  background: #1a2234 !important;
   color: #e8edf5 !important;
-  border: 1px solid rgba(0,229,255,0.3) !important;
-  font-size: 11px !important;
-  font-weight: 700 !important;
-  font-family: "JetBrains Mono", monospace !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4) !important;
-  padding: 3px 8px !important;
-  border-radius: 4px !important;
-}
-.rc-slider-tooltip-arrow {
-  border-top-color: rgba(0,229,255,0.3) !important;
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
+  margin-top: 8px !important;
 }
 
-/* Fallback — any dropdown not explicitly classed, stay dark too */
+/* Slider floating tooltip (The label appearing when dragging) */
+.rc-slider-tooltip-inner {
+  background-color: #1a2234 !important;
+  color: #ffffff !important;
+  border: 1px solid #00e5ff !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+.rc-slider-tooltip-arrow {
+  border-top-color: #00e5ff !important;
+}
+
+/* Fallback — any dropdown box not explicitly caught */
 .Select-control {
-  background: #0f1623 !important;
-  border: 1px solid rgba(255,255,255,0.12) !important;
+  background-color: #0d1117 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
 }
 .Select-value-label { color: #e8edf5 !important; }
 .Select-placeholder { color: #6a8099 !important; }
