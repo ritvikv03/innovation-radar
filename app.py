@@ -19,6 +19,7 @@ Sponsor requirements implemented:
 
 from __future__ import annotations
 
+import atexit
 import hashlib
 import os
 import sys
@@ -1644,6 +1645,14 @@ def _layout() -> html.Div:
 
 app.layout = _layout()
 
+# ── Start scheduler at module load (works under gunicorn and __main__) ──
+# Must be AFTER app.layout so Dash is fully initialised.
+# gunicorn imports this module directly — __main__ guard would skip it.
+_scheduler_engine.start()
+atexit.register(_scheduler_engine.stop)
+log.info("SchedulerEngine started at module load. Next scout: %s",
+         HEALTH.get("next_run_utc"))
+
 
 # ─────────────────────────────────────────────────────────────
 # Callbacks
@@ -2082,7 +2091,7 @@ def lens_search(topic: str | None, custom: str | None, _ns: int) -> html.Div:
 if __name__ == "__main__":
     _preflight()
 
-    _scheduler_engine.start()
+    # Scheduler already started at module load — just log status
     stats = _db_stats_cached()
     log.info("App starting — Astra DB: %d signals, HuggingFace: %s",
              stats["total"], "OK" if _HF_OK else "NO KEY")
@@ -2096,4 +2105,3 @@ if __name__ == "__main__":
     # Use PORT env var (Hugging Face / Render) or default to 7860
     port = int(os.environ.get("PORT", 7860))
     app.run(debug=False, host="0.0.0.0", port=port)
-    _scheduler_engine.stop()

@@ -186,14 +186,16 @@ class SchedulerEngine:
             timezone="UTC",
         )
 
-        # Scout job — runs every N hours, NOT immediately on startup
+        # Scout job — fires immediately on first start, then every N hours.
+        # next_run_time=now() ensures the first cycle runs right away so the
+        # dashboard is populated without waiting 6 hours after deployment.
         self._scheduler.add_job(
             _run_scout_cycle,
             trigger=IntervalTrigger(hours=self._interval_hours),
             id="scout",
             name="PESTEL Scout Cycle",
             replace_existing=True,
-            next_run_time=None,
+            next_run_time=datetime.now(timezone.utc),
         )
 
         # Heartbeat — every 30 s
