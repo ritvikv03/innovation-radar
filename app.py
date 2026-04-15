@@ -618,6 +618,7 @@ def _tab_radar() -> html.Div:
                              ["All", "POLITICAL", "ECONOMIC", "SOCIAL",
                               "TECHNOLOGICAL", "ENVIRONMENTAL", "LEGAL"]],
                     value="All", clearable=False,
+                    className="dark-dropdown",
                     style={"marginBottom": "14px"},
                 ),
                 html.Div("Min Disruption Score", className="filter-label"),
@@ -625,8 +626,12 @@ def _tab_radar() -> html.Div:
                     id="radar-score-slider",
                     min=0, max=1, step=0.05,
                     value=0.50,
-                    marks={0: "0", 0.50: "0.50", 0.75: "0.75", 1: "1"},
-                    tooltip={"placement": "bottom"},
+                    marks={0: {"label": "0", "style": {"color": "#a8bcd0"}},
+                           0.50: {"label": "0.50", "style": {"color": "#a8bcd0"}},
+                           0.75: {"label": "0.75", "style": {"color": "#ffab00"}},
+                           1: {"label": "1", "style": {"color": "#a8bcd0"}}},
+                    tooltip={"placement": "bottom", "always_visible": False},
+                    className="dark-slider",
                 ),
                 html.Div(
                     "Default shows HIGH + CRITICAL only (≥ 0.50)",
@@ -1273,6 +1278,7 @@ def _tab_reports() -> html.Div:
                             value=default,
                             clearable=False,
                             placeholder="No reports found in outputs/reports/",
+                            className="dark-dropdown",
                         ),
                     ], style={"flex": "1"}),
                     dbc.Button(
@@ -1439,6 +1445,7 @@ def _tab_lens() -> html.Div:
                     options=[{"label": t, "value": t} for t in _LENS_PRESETS],
                     value=_LENS_PRESETS[0],
                     clearable=False,
+                    className="dark-dropdown",
                     style={"marginBottom": "10px"},
                 ),
                 dcc.Input(

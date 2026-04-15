@@ -629,114 +629,149 @@ html, body {
 .js-plotly-plot .plotly, .plot-container { background: transparent !important; }
 .modebar-container { display: none !important; }
 
-/* ── 20. DCC Dropdown + Slider — Full Dark/Light Overrides ─────── */
-
+/* ── 20. DCC Dropdown — Forced Dark Theme ──────────────────────── */
 /*
- * Dash 4.x dropdowns can render with WHITE backgrounds (Bootstrap default).
- * Instead of fighting the background, we force BLACK TEXT on the white bar
- * so the selected value is always readable.
+ * dcc.Dropdown in Dash 4.x uses VirtualizedSelect / React-Select internals.
+ * Bootstrap 5.3 data-bs-theme=dark does NOT reach these React components.
+ * We target every internal class with .dark-dropdown parent selector so
+ * only our dropdowns are affected (not any DBC native dropdowns).
  */
 
-/* ── React-Select based dropdowns (Dash <=4.0 / legacy) ───────── */
-.Select-control {
-  background: var(--input-bg) !important;
-  border: 1px solid var(--card-border) !important;
-  border-radius: var(--r-sm) !important;
-  min-height: 34px !important;
+.dark-dropdown .Select-control {
+  background: #0f1623 !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  border-radius: 8px !important;
+  min-height: 36px !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
 }
-.Select-control:hover { border-color: var(--card-hi) !important; }
-.is-focused .Select-control, .Select--is-focused .Select-control {
-  border-color: var(--cyan) !important;
-  box-shadow: 0 0 0 2px rgba(0,229,255,0.1) !important;
+.dark-dropdown .Select-control:hover {
+  border-color: rgba(0,229,255,0.4) !important;
 }
-.Select-menu-outer {
-  background: var(--raise) !important;
-  border: 1px solid var(--card-border) !important;
-  border-radius: var(--r-sm) !important;
-  z-index: 1000;
-  margin-top: 2px !important;
+.dark-dropdown.is-focused .Select-control,
+.dark-dropdown .Select--is-focused .Select-control {
+  border-color: #00e5ff !important;
+  box-shadow: 0 0 0 2px rgba(0,229,255,0.12) !important;
 }
-.Select-option {
-  color: var(--mid) !important;
+
+/* Selected value / placeholder */
+.dark-dropdown .Select-value-label { color: #e8edf5 !important; font-size: 12.5px !important; }
+.dark-dropdown .Select-value        { color: #e8edf5 !important; }
+.dark-dropdown .Select-placeholder  { color: #6a8099 !important; font-size: 12px !important; }
+
+/* Chevron */
+.dark-dropdown .Select-arrow-zone { padding-right: 10px !important; }
+.dark-dropdown .Select-arrow      { border-top-color: #6a8099 !important; }
+
+/* Search input inside dropdown */
+.dark-dropdown .Select-input > input,
+.dark-dropdown input {
+  color: #e8edf5 !important;
   background: transparent !important;
   font-size: 12px !important;
-  padding: 8px 12px !important;
-}
-.Select-option:hover,
-.Select-option.is-focused  { color: var(--hi) !important; background: rgba(255,255,255,0.05) !important; }
-.Select-option.is-selected { color: var(--cyan) !important; background: rgba(0,229,255,0.08) !important; }
-.Select-value-label   { color: var(--hi) !important; font-size: 12px !important; }
-.Select-placeholder   { color: var(--lo) !important; font-size: 12px !important; }
-.Select-arrow-zone    { padding-right: 10px !important; }
-.Select-arrow         { border-top-color: var(--mid) !important; }
-
-/* ── Dash 4.x Dropdown (new class names) ──────────────────────── */
-/* The outer wrapper */
-.dash-dropdown .Select-control,
-.dash-dropdown .Select-value-label,
-.dash-dropdown .Select-value {
-  color: #1a1a2e !important;
 }
 
-/* Selected value text — BLACK on the white bar */
-.dash-dropdown .Select-value-label {
-  color: #1a1a2e !important;
-  font-weight: 500 !important;
+/* Dropdown menu */
+.dark-dropdown .Select-menu-outer {
+  background: #131922 !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+  z-index: 9999 !important;
+  margin-top: 3px !important;
 }
+.dark-dropdown .Select-menu { background: transparent !important; }
 
-/* Placeholder text — dark gray */
-.dash-dropdown .Select-placeholder {
-  color: #555 !important;
+/* Menu options */
+.dark-dropdown .VirtualizedSelectOption,
+.dark-dropdown .Select-option {
+  color: #a8bcd0 !important;
+  background: transparent !important;
+  font-size: 12px !important;
+  padding: 9px 14px !important;
+  cursor: pointer !important;
 }
-
-/* Menu items — dark text so they're readable */
-.dash-dropdown .VirtualizedSelectOption,
-.dash-dropdown .Select-option {
-  color: #1a1a2e !important;
-  background: #fff !important;
+.dark-dropdown .VirtualizedSelectFocusedOption,
+.dark-dropdown .Select-option.is-focused,
+.dark-dropdown .VirtualizedSelectOption:hover,
+.dark-dropdown .Select-option:hover {
+  color: #e8edf5 !important;
+  background: rgba(255,255,255,0.06) !important;
 }
-.dash-dropdown .VirtualizedSelectFocusedOption,
-.dash-dropdown .Select-option.is-focused,
-.dash-dropdown .VirtualizedSelectOption:hover,
-.dash-dropdown .Select-option:hover {
-  color: #000 !important;
-  background: #e8f0fe !important;
-}
-.dash-dropdown .VirtualizedSelectSelectedOption,
-.dash-dropdown .Select-option.is-selected {
-  color: #0a66c2 !important;
-  background: #e0f2ff !important;
-}
-
-/* Input field text inside the dropdown search */
-.dash-dropdown input,
-.dash-dropdown .Select-input > input {
-  color: #1a1a2e !important;
-}
-
-/* ── DCC Slider — Marks and Tooltip ───────────────────────────── */
-.rc-slider-rail   { background: rgba(255,255,255,0.08) !important; }
-.rc-slider-track  { background: var(--cyan) !important; }
-.rc-slider-handle {
-  border-color: var(--cyan) !important;
-  background: var(--base) !important;
-  box-shadow: 0 0 0 2px rgba(0,229,255,0.2) !important;
-}
-.rc-slider-dot-active { border-color: var(--cyan) !important; }
-.rc-slider-mark-text  { color: var(--lo) !important; font-size: 10px !important; }
-
-/* Slider tooltip (the floating number label) */
-.rc-slider-tooltip-inner {
-  color: #1a1a2e !important;
-  background: #fff !important;
-  border: 1px solid #ddd !important;
-  font-size: 11px !important;
+.dark-dropdown .VirtualizedSelectSelectedOption,
+.dark-dropdown .Select-option.is-selected {
+  color: #00e5ff !important;
+  background: rgba(0,229,255,0.08) !important;
   font-weight: 600 !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+}
+
+/* ── DCC Slider — Dark Theme ───────────────────────────────────── */
+.dark-slider { padding: 6px 0 28px !important; }
+
+.dark-slider .rc-slider-rail {
+  background: rgba(255,255,255,0.1) !important;
+  height: 4px !important;
+}
+.dark-slider .rc-slider-track {
+  background: #00e5ff !important;
+  height: 4px !important;
+}
+.dark-slider .rc-slider-handle {
+  width: 16px !important;
+  height: 16px !important;
+  margin-top: -6px !important;
+  border: 2px solid #00e5ff !important;
+  background: #0d1117 !important;
+  box-shadow: 0 0 0 3px rgba(0,229,255,0.2) !important;
+  opacity: 1 !important;
+}
+.dark-slider .rc-slider-handle:hover,
+.dark-slider .rc-slider-handle:active {
+  border-color: #00e5ff !important;
+  box-shadow: 0 0 0 5px rgba(0,229,255,0.25) !important;
+}
+.dark-slider .rc-slider-dot {
+  background: rgba(255,255,255,0.1) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+.dark-slider .rc-slider-dot-active {
+  background: rgba(0,229,255,0.3) !important;
+  border-color: #00e5ff !important;
+}
+.dark-slider .rc-slider-mark-text {
+  color: #6a8099 !important;
+  font-size: 10px !important;
+  font-family: "JetBrains Mono", monospace !important;
+}
+
+/* Slider floating tooltip */
+.rc-slider-tooltip-inner {
+  background: #1a2234 !important;
+  color: #e8edf5 !important;
+  border: 1px solid rgba(0,229,255,0.3) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  font-family: "JetBrains Mono", monospace !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4) !important;
+  padding: 3px 8px !important;
+  border-radius: 4px !important;
 }
 .rc-slider-tooltip-arrow {
-  border-top-color: #fff !important;
+  border-top-color: rgba(0,229,255,0.3) !important;
 }
+
+/* Fallback — any dropdown not explicitly classed, stay dark too */
+.Select-control {
+  background: #0f1623 !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+}
+.Select-value-label { color: #e8edf5 !important; }
+.Select-placeholder { color: #6a8099 !important; }
+.Select-menu-outer  { background: #131922 !important; border-color: rgba(255,255,255,0.1) !important; }
+.Select-option      { color: #a8bcd0 !important; background: transparent !important; }
+.Select-option.is-focused  { background: rgba(255,255,255,0.06) !important; color: #e8edf5 !important; }
+.Select-option.is-selected { background: rgba(0,229,255,0.08) !important; color: #00e5ff !important; }
+.Select-arrow { border-top-color: #6a8099 !important; }
 
 /* ── 21. Strategic Report Markdown Viewer ──────────────────────── */
 .report-markdown {
