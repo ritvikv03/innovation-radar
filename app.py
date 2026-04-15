@@ -112,6 +112,7 @@ _CAT_COLOUR = {
     "ENVIRONMENTAL": "#80deea",
     "LEGAL":         "#ef9a9a",
 }
+_DIM_COLOUR = _CAT_COLOUR   # alias — same mapping used by chart + UI helpers
 
 _DIM_PILL_CODE = {
     "POLITICAL": "P", "ECONOMIC": "E", "SOCIAL": "S",
