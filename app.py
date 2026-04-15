@@ -147,9 +147,10 @@ _CHART_BASE = dict(
     margin=dict(l=36, r=16, t=44, b=36),
     hoverlabel=dict(
         bgcolor="rgba(6,8,13,0.97)",
-        bordercolor="rgba(255,255,255,0.08)",
+        bordercolor="rgba(255,255,255,0.12)",
         font_size=11,
         font_family="Inter, sans-serif",
+        font_color="#e8edf5",
     ),
 )
 

@@ -831,6 +831,66 @@ html, body {
 [data-bs-theme="dark"] .dropdown-item { color: var(--mid); }
 [data-bs-theme="dark"] .dropdown-item:hover { background: rgba(255,255,255,0.05); color: var(--hi); }
 
+/* ── DBC / Bootstrap Button Overrides — force dark-on-light readability ───── */
+/* White-background buttons must have dark text */
+.btn-light, .btn-outline-light,
+.btn-secondary, .btn-outline-secondary,
+.btn-primary, .btn-outline-primary,
+.btn-success, .btn-outline-success,
+.btn-info, .btn-outline-info,
+.btn-warning, .btn-outline-warning,
+.btn-danger, .btn-outline-danger {
+  color: var(--hi) !important;
+}
+
+/* White-background dropdown buttons (common in DBC) */
+.btn.dropdown-toggle,
+.btn.dropdown-toggle:focus,
+.btn.dropdown-toggle:active {
+  background: var(--input-bg) !important;
+  border-color: var(--card-border) !important;
+  color: var(--hi) !important;
+}
+.btn.dropdown-toggle:hover {
+  background: rgba(255,255,255,0.08) !important;
+  border-color: var(--card-hi) !important;
+  color: var(--hi) !important;
+}
+
+/* Bootstrap dropdown menu items in dark mode */
+.dropdown-menu {
+  background: var(--raise) !important;
+  border: 1px solid var(--card-border) !important;
+}
+.dropdown-menu .dropdown-item {
+  color: var(--mid) !important;
+  font-size: 12px;
+}
+.dropdown-menu .dropdown-item:hover,
+.dropdown-menu .dropdown-item:focus {
+  color: var(--hi) !important;
+  background: rgba(255,255,255,0.06) !important;
+}
+.dropdown-menu .dropdown-item.active,
+.dropdown-menu .dropdown-item:active {
+  color: var(--cyan) !important;
+  background: rgba(0,229,255,0.08) !important;
+}
+
+/* ── DCC Dropdown (React-Select) — comprehensive dark overrides ───────────── */
+/* The inner input text */
+.Select input { color: var(--hi) !important; }
+/* Single-value display */
+.Select-value { color: var(--hi) !important; }
+.Select-value-label { color: var(--hi) !important; }
+/* Multi-value tags */
+.Select--multi .Select-value { background: rgba(0,229,255,0.1) !important; border-color: rgba(0,229,255,0.3) !important; }
+.Select--multi .Select-value-label { color: var(--hi) !important; }
+.Select--multi .Select-value-icon { color: var(--mid) !important; border-color: rgba(255,255,255,0.1) !important; }
+.Select--multi .Select-value-icon:hover { background: rgba(255,23,68,0.15) !important; color: var(--red) !important; }
+/* Clear button */
+.Select-clear-zone { color: var(--mid) !important; }
+
 @media (max-width: 1100px) {
   :root { --sidebar-w: 200px; }
   .kpi-value  { font-size: 28px; }
