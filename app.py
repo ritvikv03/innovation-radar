@@ -728,9 +728,13 @@ def _chat_bubble(text: str, role: str = "assistant") -> html.Div:
 def _tab_chatbot(history: list) -> html.Div:
     """Strategic Advisor — conversational AI interface."""
     welcome = _chat_bubble(
-        "Fendt Relational Brain — Multi-Agent Strategic Advisor\n\n"
-        "Router automatically directs queries to the Calculator Agent "
-        "(quantitative) or Analyst Agent (synthesis). How can I help you today?",
+        "**Fendt Commercial Intelligence Advisor**\n\n"
+        "I'm your embedded Fendt/AGCO marketing & sales analyst. "
+        "Ask me about dealer positioning, competitive differentiation against Deere/CNH/Claas, "
+        "precision farming upsell narratives, regulatory urgency messaging, or pipeline priorities "
+        "— all grounded in live PESTEL signals from the database.\n\n"
+        "Questions are routed automatically: data questions go to the **Calculator Agent**, "
+        "strategic and messaging questions go to the **Analyst Agent**.",
         role="assistant",
     )
     bubbles = [welcome]
@@ -751,11 +755,11 @@ def _tab_chatbot(history: list) -> html.Div:
         bubbles.append(bubble)
 
     chips = [
-        "What immediate supply chain pivots must Tier-1 OEMs make?",
-        "Which EU regulations pose the highest 12-month compliance risk?",
-        "What M&A targets should agricultural OEMs consider?",
-        "How does CAP reform reshape the precision farming market?",
-        "Which technology investments have the strongest ROI case?",
+        "Which signals should Fendt's sales team lead with in dealer conversations this quarter?",
+        "How should Fendt marketing position the Vario tractor line against CNH and Deere given current EU signals?",
+        "What precision farming trends give AGCO the strongest upsell narrative to existing customers?",
+        "Which regulatory changes create urgency for farmers to upgrade equipment — and how do we message that?",
+        "What competitive threats from John Deere, CNH, or Claas should Fendt sales reps be prepared to counter?",
     ]
 
     return html.Div([
@@ -787,7 +791,7 @@ def _tab_chatbot(history: list) -> html.Div:
                         html.Div("◆", style={"color": "#00e5ff", "fontSize": "8px", "marginRight": "8px", "marginTop": "2px"}),
                         html.Div([
                             html.Div("Calculator Agent", style={"color": "#00e5ff", "fontSize": "11px", "fontWeight": "600"}),
-                            html.Div("Quantitative analysis, score aggregation, trend math.",
+                            html.Div("Signal scoring, pipeline metrics, disruption rankings by dimension.",
                                      style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "2px"}),
                         ]),
                     ], style={"display": "flex", "marginBottom": "12px"}),
@@ -795,11 +799,29 @@ def _tab_chatbot(history: list) -> html.Div:
                         html.Div("◆", style={"color": "#ffd93d", "fontSize": "8px", "marginRight": "8px", "marginTop": "2px"}),
                         html.Div([
                             html.Div("Analyst Agent", style={"color": "#ffd93d", "fontSize": "11px", "fontWeight": "600"}),
-                            html.Div("Qualitative synthesis, RAG-based strategic implications.",
+                            html.Div("Sales positioning, competitive messaging, marketing actions vs Deere/CNH/Claas.",
                                      style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "2px"}),
                         ]),
                     ], style={"display": "flex"}),
                 ]),
+
+                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "18px 0"}),
+
+                # Coverage areas
+                html.Div("KNOWLEDGE AREAS", className="section-label"),
+                *[html.Div(area, style={"fontSize": "10px", "color": "#7d8fa8",
+                                        "marginBottom": "4px", "paddingLeft": "8px",
+                                        "borderLeft": "2px solid rgba(0,229,255,0.2)"})
+                  for area in [
+                      "Fendt Vario / IDEAL / FendtONE portfolio",
+                      "AGCO · Massey Ferguson · Valtra · Challenger",
+                      "Competitive: Deere, CNH, Claas, Kubota",
+                      "EU CAP reform & subsidy dynamics",
+                      "Precision ag adoption & dealer economics",
+                      "Emissions regs · electrification pipeline",
+                      "Eastern EU market expansion signals",
+                      "Commodity price → farmer buying intent",
+                  ]],
 
                 html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "18px 0"}),
 
@@ -808,7 +830,7 @@ def _tab_chatbot(history: list) -> html.Div:
                 html.Div(_HF_REPO_ID,
                          style={"fontFamily": "JetBrains Mono, monospace",
                                 "fontSize": "10px", "color": "#e8edf5"}),
-                html.Div("Universal Strategic Analysis",
+                html.Div("Fendt/AGCO Commercial Intelligence",
                          style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "4px"}),
             ], className="war-card"), md=5),
         ], className="g-3"),
@@ -1859,11 +1881,11 @@ def update_sidebar(_i: int, _n: int):
 )
 def send_message(n_send, n_sub, c0, c1, c2, c3, c4, question_val, history_data):
     chip_texts = [
-        "What immediate supply chain pivots must Tier-1 OEMs make?",
-        "Which EU regulations pose the highest 12-month compliance risk?",
-        "What M&A targets should agricultural OEMs consider?",
-        "How does CAP reform reshape the precision farming market?",
-        "Which technology investments have the strongest ROI case?",
+        "Which signals should Fendt's sales team lead with in dealer conversations this quarter?",
+        "How should Fendt marketing position the Vario tractor line against CNH and Deere given current EU signals?",
+        "What precision farming trends give AGCO the strongest upsell narrative to existing customers?",
+        "Which regulatory changes create urgency for farmers to upgrade equipment — and how do we message that?",
+        "What competitive threats from John Deere, CNH, or Claas should Fendt sales reps be prepared to counter?",
     ]
 
     question = question_val or ""
