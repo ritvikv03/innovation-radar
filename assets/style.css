@@ -641,17 +641,21 @@ html, body {
   min-height: 36px !important;
 }
 
-/* Selected text — BLACK */
+/* Selected text — Force BLACK with extremely high specificity to override Dash defaults */
 .Select-value-label,
-.dark-dropdown .Select-value-label,
 .Select-value,
+.Select--single > .Select-control .Select-value .Select-value-label,
+.Select--multi > .Select-control .Select-value .Select-value-label,
+.dark-dropdown .Select-value-label,
 .dark-dropdown .Select-value {
-  color: #000000 !important;
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
 }
 
 /* Placeholder — DARK GRAY */
 .Select-placeholder,
-.dark-dropdown .Select-placeholder {
+.dark-dropdown .Select-placeholder,
+.Select--single > .Select-control .Select-placeholder {
   color: #555555 !important;
 }
 
