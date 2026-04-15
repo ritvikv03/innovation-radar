@@ -769,7 +769,7 @@ def _tab_chatbot(history: list) -> html.Div:
             dbc.Col(html.Div([
                 # Strategic prompts
                 html.Div("STRATEGIC PROMPTS", className="section-label"),
-                *[html.Div(
+                *[html.Button(
                     c, id=f"chip-{i}", n_clicks=0, className="advisor-chip",
                 ) for i, c in enumerate(chips)],
 

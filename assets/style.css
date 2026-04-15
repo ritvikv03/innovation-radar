@@ -528,26 +528,39 @@ html, body {
 /* Strategic Advisor prompt chips — gradient border */
 .advisor-chip {
   display: block;
-  padding: 10px 14px;
+  width: 100%;
+  padding: 10px 14px 10px 16px;
   background: rgba(0, 229, 255, 0.03);
-  border: 1px solid rgba(0, 229, 255, 0.25);
-  border-left: 3px solid;
-  border-image: linear-gradient(180deg, #00e5ff, #b388ff) 1;
-  border-radius: 0;
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-left: 3px solid var(--cyan);
+  border-radius: var(--r-sm);
   font-size: 11.5px;
+  font-family: var(--font);
   color: var(--hi);
   cursor: pointer;
   margin-bottom: 8px;
-  transition: all 0.2s ease;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
   line-height: 1.5;
   letter-spacing: 0.01em;
+  text-align: left;
+  outline: none;
 }
 .advisor-chip:hover {
-  background: rgba(0, 229, 255, 0.08);
+  background: rgba(0, 229, 255, 0.09);
   border-color: rgba(0, 229, 255, 0.5);
-  border-image: linear-gradient(180deg, #00e5ff, #ffd93d) 1;
-  color: #fff;
+  border-left-color: var(--cyan);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.08);
+  color: #ffffff;
   transform: translateX(3px);
+}
+.advisor-chip:active {
+  background: rgba(0, 229, 255, 0.15);
+  transform: translateX(3px) scale(0.99);
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.15);
+}
+.advisor-chip:focus-visible {
+  outline: 2px solid rgba(0, 229, 255, 0.5);
+  outline-offset: 2px;
 }
 
 /* ── 17. Source Link ───────────────────────────────────────────── */
