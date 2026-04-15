@@ -808,30 +808,43 @@ _CYTO_STYLESHEET = [
         "style": {
             "label":            "data(label)",
             "background-color": "data(colour)",
-            "color":            "#e2e8f0",
-            "font-size":        "10px",
-            "font-family":      "JetBrains Mono, monospace",
+            "color":            "#ffffff",
+            "font-size":        "11px",
+            "font-weight":      "600",
+            "font-family":      "Inter, -apple-system, sans-serif",
             "text-wrap":        "wrap",
-            "text-max-width":   "120px",
-            "width":            "28px",
-            "height":           "28px",
+            "text-max-width":   "130px",
+            "text-valign":      "bottom",
+            "text-margin-y":    "6px",
+            "text-background-color":   "rgba(6,8,13,0.80)",
+            "text-background-opacity": "1",
+            "text-background-padding": "3px",
+            "width":            "34px",
+            "height":           "34px",
             "border-width":     "2px",
-            "border-color":     "rgba(255,255,255,0.15)",
+            "border-color":     "rgba(255,255,255,0.25)",
+            "box-shadow":       "0 0 8px data(colour)",
         },
     },
     {
         "selector": "edge",
         "style": {
-            "line-color":          "#9cb3c9",
-            "target-arrow-color":  "#9cb3c9",
-            "target-arrow-shape":  "triangle",
-            "curve-style":         "bezier",
-            "opacity":             "0.6",
-            "width":               "data(weight_px)",
-            "label":               "data(relationship)",
-            "font-size":           "9px",
-            "color":               "#9cb3c9",
-            "text-opacity":        "0.7",
+            "line-color":              "#4fc3f7",
+            "target-arrow-color":      "#4fc3f7",
+            "target-arrow-shape":      "triangle",
+            "arrow-scale":             "1.4",
+            "curve-style":             "bezier",
+            "opacity":                 "0.9",
+            "width":                   "data(weight_px)",
+            "label":                   "data(relationship)",
+            "font-size":               "10px",
+            "font-family":             "Inter, sans-serif",
+            "color":                   "#e8edf5",
+            "text-opacity":            "1",
+            "text-rotation":           "autorotate",
+            "text-background-color":   "rgba(6,8,13,0.85)",
+            "text-background-opacity": "1",
+            "text-background-padding": "3px",
         },
     },
     {
@@ -839,24 +852,47 @@ _CYTO_STYLESHEET = [
         "style": {
             "border-color": "#00e5ff",
             "border-width": "3px",
+            "box-shadow":   "0 0 14px #00e5ff",
+        },
+    },
+    {
+        "selector": "edge:selected",
+        "style": {
+            "line-color":         "#00e5ff",
+            "target-arrow-color": "#00e5ff",
+            "opacity":            "1",
+            "width":              "3",
         },
     },
 ]
 
 
 def _load_graph_elements() -> list[dict]:
-    """Load data/graph.json and convert to cytoscape elements format."""
+    """Load data/graph.json and convert to cytoscape elements format.
+
+    Only nodes that participate in at least one edge are included — isolated
+    nodes add visual noise without conveying relationships.
+    """
     if not _GRAPH_JSON.exists():
         return []
     raw = json.loads(_GRAPH_JSON.read_text())
+
+    # Collect IDs of nodes that appear in at least one link
+    connected_ids: set[str] = set()
+    for link in raw.get("links", []):
+        connected_ids.add(link["source"])
+        connected_ids.add(link["target"])
+
     elements: list[dict] = []
     for node in raw.get("nodes", []):
+        if node["id"] not in connected_ids:
+            continue
         cat = node.get("category", "")
         elements.append({
             "data": {
-                "id":     node["id"],
-                "label":  node.get("label", node["id"])[:40],
-                "colour": _CAT_COLOUR.get(cat, "#9cb3c9"),
+                "id":       node["id"],
+                "label":    node.get("label", node["id"])[:40],
+                "colour":   _CAT_COLOUR.get(cat, "#9cb3c9"),
                 "category": cat,
             },
         })
@@ -867,7 +903,7 @@ def _load_graph_elements() -> list[dict]:
                 "source":       link["source"],
                 "target":       link["target"],
                 "relationship": link.get("relationship", ""),
-                "weight_px":    max(1, int(weight * 6)),
+                "weight_px":    max(2, int(weight * 6)),
             },
         })
     return elements
@@ -957,8 +993,8 @@ def _tab_graph() -> html.Div:
     elements   = _load_graph_elements_cached()
     node_count = sum(1 for e in elements if "source" not in e.get("data", {}))
     edge_count = len(elements) - node_count
+    has_data   = node_count > 0
 
-    # Shared control buttons (always present)
     graph_controls = html.Div([
         dbc.Button(
             "Rebuild Graph", id="rebuild-graph-btn",
@@ -974,35 +1010,6 @@ def _tab_graph() -> html.Div:
                  style={"fontSize": "10px", "color": "#e8edf5", "marginTop": "6px"}),
     ], style={"marginBottom": "12px"})
 
-    if node_count == 0:
-        empty = html.Div([
-            html.Div("○", className="empty-state-icon"),
-            html.Div("No graph data yet", className="empty-state-title"),
-            html.Div(
-                "Run the Scout to ingest signals. The Knowledge Graph builds automatically "
-                "after each cycle — only nodes derived from live Astra DB signals appear here. "
-                "Use 'Rebuild Graph' to reconstruct from the current DB state.",
-                className="empty-state-body",
-            ),
-        ], className="empty-state")
-        return html.Div([
-            dbc.Row([
-                dbc.Col(html.Div(empty, className="chart-card",
-                                 style={"minHeight": "400px", "display": "flex",
-                                        "alignItems": "center", "justifyContent": "center"}),
-                        md=9),
-                dbc.Col(html.Div([
-                    graph_controls,
-                    html.Div("GRAPH INFO", className="section-label"),
-                    _metric("Nodes", "—"), html.Div(style={"height": "8px"}),
-                    _metric("Edges", "—"),
-                    html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
-                    html.Div("Run the Scout to generate graph data.",
-                             style={"fontSize": "10px", "color": "#e8edf5", "lineHeight": "1.6"}),
-                ], className="war-card"), md=3),
-            ], className="g-3"),
-        ])
-
     legend = [
         html.Div([
             html.Div(style={"width": "10px", "height": "10px", "borderRadius": "50%",
@@ -1013,26 +1020,60 @@ def _tab_graph() -> html.Div:
         for cat, col in _CAT_COLOUR.items()
     ]
 
+    # Cytoscape is always rendered so the callback target always exists.
+    # Empty state is an absolute overlay that disappears once nodes arrive.
+    graph_canvas = html.Div([
+        cyto.Cytoscape(
+            id="knowledge-graph",
+            elements=elements,
+            layout={
+                "name":                       "cose",
+                "animate":                    False,
+                "nodeRepulsion":              8000,
+                "idealEdgeLength":            140,
+                "gravity":                    0.03,
+                "numIter":                    2500,
+                "padding":                    50,
+                "componentSpacing":           100,
+                "nodeDimensionsIncludeLabels": True,
+                "randomize":                  False,
+            },
+            stylesheet=_CYTO_STYLESHEET,
+            style={"width": "100%", "height": "580px",
+                   "background": "rgba(13,17,23,0.95)",
+                   "borderRadius": "8px"},
+        ),
+        # Empty-state overlay — covers graph area when there are no nodes
+        html.Div([
+            html.Div("○", className="empty-state-icon"),
+            html.Div("No graph data yet", className="empty-state-title"),
+            html.Div(
+                "Run the Scout to ingest signals. The Knowledge Graph builds automatically "
+                "after each cycle. Use 'Rebuild Graph' to reconstruct from the current DB state.",
+                className="empty-state-body",
+            ),
+        ], className="empty-state", style={
+            "display":      "none" if has_data else "flex",
+            "position":     "absolute",
+            "top":          "0",
+            "left":         "0",
+            "right":        "0",
+            "bottom":       "0",
+            "borderRadius": "8px",
+            "background":   "rgba(13,17,23,0.95)",
+            "zIndex":       "10",
+        }),
+    ], style={"position": "relative"})
+
     return html.Div([
         dbc.Row([
-            dbc.Col(html.Div(
-                cyto.Cytoscape(
-                    id="knowledge-graph",
-                    elements=elements,
-                    layout={"name": "cose", "animate": False},
-                    stylesheet=_CYTO_STYLESHEET,
-                    style={"width": "100%", "height": "560px",
-                           "background": "rgba(13,17,23,0.95)",
-                           "borderRadius": "8px"},
-                ),
-                className="chart-card",
-            ), md=9),
+            dbc.Col(html.Div(graph_canvas, className="chart-card"), md=9),
             dbc.Col(html.Div([
                 graph_controls,
                 html.Div("GRAPH INFO", className="section-label"),
-                _metric("Nodes", str(node_count)),
+                _metric("Nodes", str(node_count) if has_data else "—"),
                 html.Div(style={"height": "8px"}),
-                _metric("Edges", str(edge_count)),
+                _metric("Edges", str(edge_count) if has_data else "—"),
                 html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
                 html.Div("INFERRED CASCADES", className="section-label"),
                 *_render_inferred_relationships(),
@@ -1043,12 +1084,8 @@ def _tab_graph() -> html.Div:
                 html.Div("DIMENSION KEY", className="section-label"),
                 *legend,
                 html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
-                html.Div("LAYOUT", className="section-label"),
-                html.Div("CoSE (force-directed)",
-                         style={"fontFamily": "JetBrains Mono, monospace",
-                                "fontSize": "10px", "color": "#e8edf5"}),
-                html.Div("Click a node to inspect · Drag to explore",
-                         style={"fontSize": "10px", "color": "#e8edf5", "marginTop": "6px"}),
+                html.Div("Click a node to inspect · Drag to rearrange",
+                         style={"fontSize": "10px", "color": "#a8bcd0", "marginTop": "6px"}),
             ], className="war-card"), md=3),
         ], className="g-3"),
     ])
@@ -1212,7 +1249,7 @@ def _tab_reports() -> html.Div:
                 html.Div(
                     "PDF export ready" if _PDF_OK else "Install fpdf2 + markdown to enable PDF export",
                     style={"fontSize": "9px",
-                           "color": "#00e676" if _PDF_OK else "#3d4f62",
+                           "color": "#00e676" if _PDF_OK else "#6a8099",
                            "lineHeight": "1.6"},
                 ),
                 html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
@@ -1791,35 +1828,46 @@ def trigger_scout(n: int) -> str:
 
 @app.callback(
     Output("graph-action-status", "children"),
-    Input("rebuild-graph-btn",   "n_clicks"),
-    Input("run-inference-btn",   "n_clicks"),
+    Output("knowledge-graph",     "elements"),
+    Input("rebuild-graph-btn",    "n_clicks"),
+    Input("run-inference-btn",    "n_clicks"),
     prevent_initial_call=True,
 )
-def graph_action(rebuild_n: int, infer_n: int) -> str:
-    """Handle Rebuild Graph and Run Inference buttons."""
+def graph_action(rebuild_n: int, infer_n: int):
+    """Handle Rebuild Graph and Run Inference buttons.
+
+    Returns both the status message and freshly-loaded graph elements so the
+    cytoscape re-renders immediately without a page reload.
+    """
     triggered = callback_context.triggered_id
     if triggered == "rebuild-graph-btn":
         try:
             counts = rebuild_graph_from_db()
             _flask_cache.delete_memoized(_load_graph_elements_cached)
+            new_elements = _load_graph_elements()
             return (
                 f"Graph rebuilt: {counts['nodes']} nodes, "
-                f"{counts['links']} edges, {counts['triples']} triples"
+                f"{counts['links']} edges, {counts['triples']} triples",
+                new_elements,
             )
         except Exception as exc:
             log.error("graph_action rebuild failed: %s", exc)
-            return f"Rebuild failed: {exc}"
+            return f"Rebuild failed: {exc}", no_update
     elif triggered == "run-inference-btn":
         try:
             result = infer_hidden_relationships()
             _flask_cache.delete_memoized(_load_graph_elements_cached)
+            new_elements = _load_graph_elements()
             added = result["inferred_added"]
             total = result["total_triples"]
-            return f"Inference complete: +{added} hidden cascades ({total} total triples)"
+            return (
+                f"Inference complete: +{added} hidden cascades ({total} total triples)",
+                new_elements,
+            )
         except Exception as exc:
             log.error("graph_action inference failed: %s", exc)
-            return f"Inference failed: {exc}"
-    return no_update
+            return f"Inference failed: {exc}", no_update
+    return no_update, no_update
 
 
 @app.callback(
