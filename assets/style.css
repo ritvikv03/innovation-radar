@@ -591,7 +591,15 @@ html, body {
 .js-plotly-plot .plotly, .plot-container { background: transparent !important; }
 .modebar-container { display: none !important; }
 
-/* ── 20. DCC Dropdown Dark Overrides ───────────────────────────── */
+/* ── 20. DCC Dropdown + Slider — Full Dark/Light Overrides ─────── */
+
+/*
+ * Dash 4.x dropdowns can render with WHITE backgrounds (Bootstrap default).
+ * Instead of fighting the background, we force BLACK TEXT on the white bar
+ * so the selected value is always readable.
+ */
+
+/* ── React-Select based dropdowns (Dash <=4.0 / legacy) ───────── */
 .Select-control {
   background: var(--input-bg) !important;
   border: 1px solid var(--card-border) !important;
@@ -624,7 +632,51 @@ html, body {
 .Select-arrow-zone    { padding-right: 10px !important; }
 .Select-arrow         { border-top-color: var(--mid) !important; }
 
-/* DCC Slider */
+/* ── Dash 4.x Dropdown (new class names) ──────────────────────── */
+/* The outer wrapper */
+.dash-dropdown .Select-control,
+.dash-dropdown .Select-value-label,
+.dash-dropdown .Select-value {
+  color: #1a1a2e !important;
+}
+
+/* Selected value text — BLACK on the white bar */
+.dash-dropdown .Select-value-label {
+  color: #1a1a2e !important;
+  font-weight: 500 !important;
+}
+
+/* Placeholder text — dark gray */
+.dash-dropdown .Select-placeholder {
+  color: #555 !important;
+}
+
+/* Menu items — dark text so they're readable */
+.dash-dropdown .VirtualizedSelectOption,
+.dash-dropdown .Select-option {
+  color: #1a1a2e !important;
+  background: #fff !important;
+}
+.dash-dropdown .VirtualizedSelectFocusedOption,
+.dash-dropdown .Select-option.is-focused,
+.dash-dropdown .VirtualizedSelectOption:hover,
+.dash-dropdown .Select-option:hover {
+  color: #000 !important;
+  background: #e8f0fe !important;
+}
+.dash-dropdown .VirtualizedSelectSelectedOption,
+.dash-dropdown .Select-option.is-selected {
+  color: #0a66c2 !important;
+  background: #e0f2ff !important;
+}
+
+/* Input field text inside the dropdown search */
+.dash-dropdown input,
+.dash-dropdown .Select-input > input {
+  color: #1a1a2e !important;
+}
+
+/* ── DCC Slider — Marks and Tooltip ───────────────────────────── */
 .rc-slider-rail   { background: rgba(255,255,255,0.08) !important; }
 .rc-slider-track  { background: var(--cyan) !important; }
 .rc-slider-handle {
@@ -634,6 +686,19 @@ html, body {
 }
 .rc-slider-dot-active { border-color: var(--cyan) !important; }
 .rc-slider-mark-text  { color: var(--lo) !important; font-size: 10px !important; }
+
+/* Slider tooltip (the floating number label) */
+.rc-slider-tooltip-inner {
+  color: #1a1a2e !important;
+  background: #fff !important;
+  border: 1px solid #ddd !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+}
+.rc-slider-tooltip-arrow {
+  border-top-color: #fff !important;
+}
 
 /* ── 21. Strategic Report Markdown Viewer ──────────────────────── */
 .report-markdown {
