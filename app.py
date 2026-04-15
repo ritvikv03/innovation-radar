@@ -755,6 +755,7 @@ def _tab_chatbot(history: list) -> html.Div:
 
     return html.Div([
         dbc.Row([
+            # ── Left: Chat Window ──────────────────────────────────
             dbc.Col([
                 html.Div(bubbles, id="chat-messages", className="chat-window"),
                 html.Div([
@@ -762,30 +763,49 @@ def _tab_chatbot(history: list) -> html.Div:
                               className="chat-input-field", n_submit=0),
                     dbc.Button("Send", id="chat-send", color="primary", className="chat-btn"),
                 ], className="chat-input-group"),
-                html.Div([
-                    html.Span("Try: ", style={"fontSize": "10px", "color": "#7d8fa8", "marginRight": "8px"}),
-                    *[dbc.Badge(c[:30] + "...", id=f"chip-{i}", className="chat-chip", color="dark")
-                      for i, c in enumerate(chips)],
-                ], className="chat-chips"),
-            ], md=9),
+            ], md=7),
+
+            # ── Right: Try Questions + Agent Info ──────────────────
             dbc.Col(html.Div([
+                # Strategic prompts
+                html.Div("STRATEGIC PROMPTS", className="section-label"),
+                *[html.Div(
+                    c, id=f"chip-{i}", n_clicks=0, className="advisor-chip",
+                ) for i, c in enumerate(chips)],
+
+                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "18px 0"}),
+
+                # Agent capabilities
                 html.Div("AGENT CAPABILITIES", className="section-label"),
                 html.Div([
-                    html.Div("Calculator Agent", style={"color": "#00e5ff", "fontSize": "11px", "fontWeight": "600"}),
-                    html.Div("Quantitative analysis, score aggregation, trend math.",
-                             style={"fontSize": "10px", "color": "#7d8fa8", "marginBottom": "10px"}),
-                    html.Div("Analyst Agent", style={"color": "#ffd93d", "fontSize": "11px", "fontWeight": "600"}),
-                    html.Div("Qualitative synthesis, RAG-based strategic implications.",
-                             style={"fontSize": "10px", "color": "#7d8fa8"}),
-                ], className="war-card"),
-                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "14px 0"}),
+                    html.Div([
+                        html.Div("◆", style={"color": "#00e5ff", "fontSize": "8px", "marginRight": "8px", "marginTop": "2px"}),
+                        html.Div([
+                            html.Div("Calculator Agent", style={"color": "#00e5ff", "fontSize": "11px", "fontWeight": "600"}),
+                            html.Div("Quantitative analysis, score aggregation, trend math.",
+                                     style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "2px"}),
+                        ]),
+                    ], style={"display": "flex", "marginBottom": "12px"}),
+                    html.Div([
+                        html.Div("◆", style={"color": "#ffd93d", "fontSize": "8px", "marginRight": "8px", "marginTop": "2px"}),
+                        html.Div([
+                            html.Div("Analyst Agent", style={"color": "#ffd93d", "fontSize": "11px", "fontWeight": "600"}),
+                            html.Div("Qualitative synthesis, RAG-based strategic implications.",
+                                     style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "2px"}),
+                        ]),
+                    ], style={"display": "flex"}),
+                ]),
+
+                html.Hr(style={"borderColor": "rgba(255,255,255,0.07)", "margin": "18px 0"}),
+
+                # Model info
                 html.Div("MODEL", className="section-label"),
                 html.Div(_HF_REPO_ID,
                          style={"fontFamily": "JetBrains Mono, monospace",
                                 "fontSize": "10px", "color": "#e8edf5"}),
                 html.Div("Universal Strategic Analysis",
-                         style={"fontSize": "10px", "color": "#e8edf5", "marginTop": "4px"}),
-            ], className="war-card"), md=4),
+                         style={"fontSize": "10px", "color": "#7d8fa8", "marginTop": "4px"}),
+            ], className="war-card"), md=5),
         ], className="g-3"),
     ])
 

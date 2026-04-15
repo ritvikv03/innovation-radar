@@ -525,6 +525,31 @@ html, body {
   background: rgba(0, 229, 255, 0.05);
 }
 
+/* Strategic Advisor prompt chips — gradient border */
+.advisor-chip {
+  display: block;
+  padding: 10px 14px;
+  background: rgba(0, 229, 255, 0.03);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-left: 3px solid;
+  border-image: linear-gradient(180deg, #00e5ff, #b388ff) 1;
+  border-radius: 0;
+  font-size: 11.5px;
+  color: var(--hi);
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+.advisor-chip:hover {
+  background: rgba(0, 229, 255, 0.08);
+  border-color: rgba(0, 229, 255, 0.5);
+  border-image: linear-gradient(180deg, #00e5ff, #ffd93d) 1;
+  color: #fff;
+  transform: translateX(3px);
+}
+
 /* ── 17. Source Link ───────────────────────────────────────────── */
 .source-link {
   display: inline-block;
