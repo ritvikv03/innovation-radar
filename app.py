@@ -549,6 +549,7 @@ def _tab_overview() -> html.Div:
     """Field Intelligence Overview — KPIs and high-level distribution."""
     signals = _get_all_signals_cached()
     stats   = _db_stats_cached()
+    top3    = sorted(signals, key=lambda s: s.disruption_score, reverse=True)[:3]
 
     return html.Div([
         # KPI Row
@@ -576,7 +577,7 @@ def _tab_overview() -> html.Div:
             ), md=6),
             dbc.Col(html.Div([
                 html.Div("TOP SIGNALS — HIGH + CRITICAL", className="section-label"),
-                *([_feed_card(s) for s in top3] if top3 else [
+                *([_urgency_card(s) for s in top3] if top3 else [
                     html.P("No signals yet. Run the Scout.",
                            style={"color": "#e8edf5", "fontSize": "12px"}),
                 ]),
@@ -643,6 +644,8 @@ def _tab_feed() -> html.Div:
     signals = _get_all_signals_cached()
     # Sort by date descending
     signals = sorted(signals, key=lambda s: s.date_ingested, reverse=True)
+    stats   = _db_stats_cached()
+    by_dim  = stats.get("by_dimension", {})
 
     def _row(s: Signal):
         col = _DIM_COLOUR.get(s.pestel_dimension.value, "#9cb3c9")
@@ -674,10 +677,10 @@ def _tab_feed() -> html.Div:
                     style={"fontSize": "11px", "color": "#e8edf5", "marginBottom": "16px"},
                 ),
                 html.Div(
-                    [_feed_card(s) for s in signals] if signals else [
-                        html.P("No signals. Run the Scout to ingest data.",
-                               style={"color": "#e8edf5", "fontSize": "12px"}),
-                    ],
+                    table if signals else html.P(
+                        "No signals. Run the Scout to ingest data.",
+                        style={"color": "#e8edf5", "fontSize": "12px"},
+                    ),
                 ),
             ], md=8),
             dbc.Col(html.Div([
@@ -1703,7 +1706,7 @@ def update_radar(dim_filter: str, min_score: float, _i: int, _n: int) -> go.Figu
 def update_sidebar(_i: int, _n: int):
     stats    = _db_stats_cached()
     total    = stats["total"]
-    by_dim   = stats.get("by_dim", {})
+    by_dim   = stats.get("by_dimension", {})
 
     db_kind    = "live" if total else "idle"
     gem_kind   = "live" if _HF_OK else "warn"
