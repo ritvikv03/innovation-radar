@@ -1478,6 +1478,7 @@ app = dash.Dash(
     title="Fendt Sentinel",
     long_callback_manager=_long_callback_manager,
 )
+server = app.server
 
 # ── Flask-Caching — memoize expensive DB + graph calls ────────
 # SimpleCache keeps results in-process (no Redis needed for single-worker Dash).
