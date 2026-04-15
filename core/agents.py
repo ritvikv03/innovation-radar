@@ -53,7 +53,7 @@ log = get_logger(__name__)
 
 _HF_TOKEN    = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
 _HF_MODEL    = "meta-llama/Llama-3.1-8B-Instruct"
-_HF_PROVIDER = "cerebras"
+_HF_PROVIDER = "novita"             # cerebras returns StopIteration intermittently
 
 
 # ── Utility: dict_to_string ───────────────────────────────────────────────────
@@ -142,6 +142,8 @@ def _hf_chat(
         max_tokens=max_tokens,
         temperature=temperature,
     )
+    if not response or not getattr(response, "choices", None):
+        raise RuntimeError("HuggingFace returned an empty response (no choices)")
     return response.choices[0].message.content.strip()
 
 

@@ -53,7 +53,7 @@ log = get_logger(__name__)
 _GRAPH_JSON_PATH = Path(__file__).parent.parent / "data" / "graph.json"
 _HF_TOKEN        = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
 _HF_REPO_ID      = "meta-llama/Llama-3.1-8B-Instruct"
-_HF_PROVIDER     = "cerebras"
+_HF_PROVIDER     = "novita"             # cerebras returns StopIteration intermittently
 _SCHEMA_VERSION  = 2
 
 _VALID_RELATIONSHIPS = {
@@ -268,7 +268,11 @@ def identify_edges(state: GraphState) -> GraphState:
                     max_tokens=16,
                     temperature=0.1,
                 )
-                raw_rel = response.choices[0].message.content.strip().upper()
+                if not response or not getattr(response, "choices", None):
+                    log.warning("identify_edges: empty response from HuggingFace, defaulting to DEPENDS_ON")
+                    raw_rel = "DEPENDS_ON"
+                else:
+                    raw_rel = response.choices[0].message.content.strip().upper()
 
                 matched_rel = "DEPENDS_ON"
                 for candidate in _VALID_RELATIONSHIPS:

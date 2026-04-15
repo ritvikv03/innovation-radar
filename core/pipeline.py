@@ -39,7 +39,7 @@ log = get_logger(__name__)
 
 _HF_TOKEN       = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
 _HF_REPO_ID     = "meta-llama/Llama-3.1-8B-Instruct"
-_HF_PROVIDER    = "cerebras"
+_HF_PROVIDER    = "novita"          # cerebras returns StopIteration intermittently
 _MAX_NEW_TOKENS = 1024
 
 
@@ -248,6 +248,8 @@ def _call_llm(text: str, max_input_chars: int = 8_000) -> LLMScoreResponse:
             max_tokens=_MAX_NEW_TOKENS,
             temperature=0.2,
         )
+        if not response or not getattr(response, "choices", None):
+            raise RuntimeError("HuggingFace returned an empty response (no choices)")
         return response.choices[0].message.content.strip()
 
     try:

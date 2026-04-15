@@ -1161,12 +1161,42 @@ def _render_report_body(path: str | None) -> html.Div:
     ])
 
 
+def _sanitize_for_pdf(text: str) -> str:
+    """Translate non-Latin-1 characters that fpdf Helvetica can't render.
+
+    fpdf2's built-in fonts are Latin-1 only.  Rather than bundle a TTF,
+    we map the most common Unicode glyphs to ASCII equivalents so the
+    export never raises a UnicodeEncodeError.
+    """
+    _MAP = {
+        "\u20ac": "EUR",    # €
+        "\u00a3": "GBP",    # £  (already Latin-1, but keep for completeness)
+        "\u2013": "-",      # –  en-dash
+        "\u2014": "--",     # —  em-dash
+        "\u2018": "'",      # '  left single quote
+        "\u2019": "'",      # '  right single quote / apostrophe
+        "\u201c": '"',      # "  left double quote
+        "\u201d": '"',      # "  right double quote
+        "\u2026": "...",    # …  ellipsis
+        "\u00b7": "*",      # ·  middle dot
+        "\u00a0": " ",      # non-breaking space
+        "\u2022": "*",      # •  bullet
+        "\u25cf": "*",      # ●  filled circle
+        "\u2192": "->",     # →  right arrow
+        "\u2190": "<-",     # ←  left arrow
+    }
+    for char, replacement in _MAP.items():
+        text = text.replace(char, replacement)
+    # Drop any remaining non-Latin-1 characters silently
+    return text.encode("latin-1", errors="ignore").decode("latin-1")
+
+
 def _md_to_pdf_bytes(content: str) -> bytes:
     """Convert markdown content to a PDF byte string using fpdf2."""
     from fpdf import FPDF  # type: ignore[import]
     import markdown as md_lib  # type: ignore[import]
 
-    html_body = md_lib.markdown(content, extensions=["tables", "fenced_code"])
+    html_body = md_lib.markdown(_sanitize_for_pdf(content), extensions=["tables", "fenced_code"])
     # fpdf2's write_html understands <b>/<i> not <strong>/<em>
     html_body = (
         html_body
