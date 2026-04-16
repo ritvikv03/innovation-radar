@@ -1567,33 +1567,34 @@ app.index_string = """<!DOCTYPE html>
         {%favicon%}
         {%css%}
         <style>
-            /* Anti-Cache Nuclear Override for Hugging Face Spaces */
+            /* Ultimate Anti-Cache Zero-Tolerance Override */
+            
+            /* 1. Closed Dropdown Bar & All Nested Spans/Divs */
             .dark-dropdown .Select-control,
-            .dark-dropdown .Select-control .Select-value {
-                background-color: #ffffff !important;
-            }
-            .dark-dropdown .Select-value-label,
-            .dark-dropdown .Select-placeholder,
-            .dark-dropdown .Select-value {
+            .dark-dropdown .Select-control * {
+                background-color: transparent !important; /* let wrapper set it */
                 color: #000000 !important;
                 font-weight: 800 !important;
                 opacity: 1 !important;
+                text-shadow: none !important;
+            }
+            .dark-dropdown .Select-control {
+                background-color: #ffffff !important;
+                border: 1px solid #ced4da !important;
             }
             .dark-dropdown .Select-arrow {
-                fill: #000000 !important;
-                color: #000000 !important;
+                border-color: #000000 transparent transparent !important;
             }
-            .dark-dropdown .Select-menu-outer {
+            
+            /* 2. Open Dropdown Menu & All Nested Options */
+            .dark-dropdown .Select-menu-outer,
+            .dark-dropdown .Select-menu-outer * {
                 background-color: #0f1623 !important;
-                border: 1px solid rgba(0,229,255,0.2) !important;
-            }
-            .dark-dropdown .Select-option {
-                color: #e8edf5 !important;
-                background-color: #0f1623 !important;
-            }
-            .dark-dropdown .Select-option.is-focused {
-                background-color: rgba(0,229,255,0.15) !important;
                 color: #ffffff !important;
+            }
+            .dark-dropdown .Select-option.is-focused,
+            .dark-dropdown .Select-option.is-focused * {
+                background-color: rgba(0,229,255,0.2) !important;
             }
         </style>
     </head>
