@@ -629,94 +629,163 @@ html, body {
 .js-plotly-plot .plotly, .plot-container { background: transparent !important; }
 .modebar-container { display: none !important; }
 
-/* ── 20. DCC Dropdown — High Contrast (Black on White) ────────── */
+/* ── 20. Nuclear Visibility Fix — High Contrast (Black on White) ── */
 
-/* Force the dropdown bar to have black text on white background as requested */
-.Select-control,
-.dark-dropdown .Select-control {
+/* 
+ * We target the IDs specifically to override Dash/Bootstrap/HuggingFace defaults.
+ * Requirement: Black text on White bar.
+ */
+
+#radar-dim-filter .Select-control,
+#reports-dropdown .Select-control,
+#lens-topic-dropdown .Select-control,
+#feed-sort-dropdown .Select-control,
+#feed-dim-dropdown .Select-control {
   background-color: #ffffff !important;
   background: #ffffff !important;
   border: 1px solid #ced4da !important;
   border-radius: 6px !important;
   min-height: 36px !important;
+  box-shadow: none !important;
 }
 
-/* Selected text — Force BLACK with extremely high specificity to override Dash defaults */
-.Select-value-label,
-.Select-value,
-.Select--single > .Select-control .Select-value .Select-value-label,
-.Select--multi > .Select-control .Select-value .Select-value-label,
-.dark-dropdown .Select-value-label,
-.dark-dropdown .Select-value {
-  color: #1a1a1a !important;
-  font-weight: 600 !important;
+/* Force the selected value text to BLACK */
+#radar-dim-filter .Select-value-label,
+#reports-dropdown .Select-value-label,
+#lens-topic-dropdown .Select-value-label,
+#feed-sort-dropdown .Select-value-label,
+#feed-dim-dropdown .Select-value-label,
+#radar-dim-filter .Select-value,
+#reports-dropdown .Select-value,
+#lens-topic-dropdown .Select-value,
+#feed-sort-dropdown .Select-value,
+#feed-dim-dropdown .Select-value {
+  color: #000000 !important;
+  font-weight: 700 !important;
 }
 
-/* Placeholder — DARK GRAY */
-.Select-placeholder,
-.dark-dropdown .Select-placeholder,
-.Select--single > .Select-control .Select-placeholder {
+/* Placeholder — Dark Gray */
+#radar-dim-filter .Select-placeholder,
+#reports-dropdown .Select-placeholder,
+#lens-topic-dropdown .Select-placeholder,
+#feed-sort-dropdown .Select-placeholder,
+#feed-dim-dropdown .Select-placeholder {
   color: #555555 !important;
 }
 
-/* Dropdown Menu (The list that opens) — Dark background with white text for consistency */
-.Select-menu-outer,
-.dark-dropdown .Select-menu-outer {
+/* Dropdown Menu (Open State) — Dark background with light text for consistency */
+.Select-menu-outer {
   background-color: #131922 !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
   z-index: 9999 !important;
 }
-
-.Select-option,
-.dark-dropdown .Select-option {
+.Select-option {
   color: #e8edf5 !important;
   background: transparent !important;
 }
-
-.Select-option.is-focused,
-.dark-dropdown .Select-option.is-focused {
-  background: rgba(255, 255, 255, 0.1) !important;
+.Select-option.is-focused {
+  background: rgba(255,255,255,0.1) !important;
   color: #ffffff !important;
 }
 
-/* ── DCC Slider — High Contrast ────────────────────────────────── */
+/* ── DCC Slider — High Contrast ── */
 
-/* Slider Marks (The numbers below the slider) — Force them to be visible */
-.rc-slider-mark-text,
-.dark-slider .rc-slider-mark-text {
+/* Marks under the slider */
+#radar-score-slider .rc-slider-mark-text {
   color: #ffffff !important;
   font-weight: 700 !important;
-  text-shadow: 0 0 4px rgba(0,0,0,0.5);
 }
 
-/* Slider floating tooltip (The label appearing when dragging) — BLACK background + WHITE text */
+/* Floating tooltip when dragging — Black background / White text */
 .rc-slider-tooltip-inner {
   background-color: #000000 !important;
   color: #ffffff !important;
   border: 1px solid #00e5ff !important;
-  font-size: 13px !important;
   font-weight: 800 !important;
-  padding: 4px 10px !important;
   opacity: 1 !important;
 }
-
-.rc-slider-tooltip-arrow {
+#radar-score-slider .rc-slider-tooltip-arrow {
   border-top-color: #000000 !important;
 }
 
-/* Ensure the slider handle itself is visible */
-.rc-slider-handle {
-  background-color: #00e5ff !important;
-  border: 2px solid #ffffff !important;
-  opacity: 1 !important;
+/* Search input */
+#radar-dim-filter input,
+#reports-dropdown input,
+#lens-topic-dropdown input,
+#feed-sort-dropdown input,
+#feed-dim-dropdown input {
+  color: #e8edf5 !important;
+  background: transparent !important;
 }
-.Select-value-label { color: #e8edf5 !important; }
-.Select-placeholder { color: #6a8099 !important; }
-.Select-menu-outer  { background: #131922 !important; border-color: rgba(255,255,255,0.1) !important; }
-.Select-option      { color: #a8bcd0 !important; background: transparent !important; }
-.Select-option.is-focused  { background: rgba(255,255,255,0.06) !important; color: #e8edf5 !important; }
-.Select-option.is-selected { background: rgba(0,229,255,0.08) !important; color: #00e5ff !important; }
-.Select-arrow { border-top-color: #6a8099 !important; }
+
+/* Dropdown menu */
+#radar-dim-filter .Select-menu-outer,
+#reports-dropdown .Select-menu-outer,
+#lens-topic-dropdown .Select-menu-outer,
+#feed-sort-dropdown .Select-menu-outer,
+#feed-dim-dropdown .Select-menu-outer {
+  background: #131922 !important;
+  border: 1px solid rgba(0,229,255,0.2) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.55) !important;
+  z-index: 9999 !important;
+  margin-top: 3px !important;
+}
+
+/* Options */
+#radar-dim-filter .Select-option,
+#reports-dropdown .Select-option,
+#lens-topic-dropdown .Select-option,
+#feed-sort-dropdown .Select-option,
+#feed-dim-dropdown .Select-option {
+  color: #a8bcd0 !important;
+  background: transparent !important;
+  font-size: 12px !important;
+  padding: 9px 14px !important;
+}
+#radar-dim-filter .Select-option.is-focused,
+#reports-dropdown .Select-option.is-focused,
+#lens-topic-dropdown .Select-option.is-focused,
+#feed-sort-dropdown .Select-option.is-focused,
+#feed-dim-dropdown .Select-option.is-focused,
+#radar-dim-filter .Select-option:hover,
+#reports-dropdown .Select-option:hover,
+#lens-topic-dropdown .Select-option:hover,
+#feed-sort-dropdown .Select-option:hover,
+#feed-dim-dropdown .Select-option:hover {
+  color: #e8edf5 !important;
+  background: rgba(255,255,255,0.07) !important;
+}
+#radar-dim-filter .Select-option.is-selected,
+#reports-dropdown .Select-option.is-selected,
+#lens-topic-dropdown .Select-option.is-selected,
+#feed-sort-dropdown .Select-option.is-selected,
+#feed-dim-dropdown .Select-option.is-selected {
+  color: #00e5ff !important;
+  background: rgba(0,229,255,0.1) !important;
+  font-weight: 600 !important;
+}
+
+/* ── Slider ──────────────────────────────────────────────────── */
+#radar-score-slider .rc-slider-rail  { background: rgba(255,255,255,0.12) !important; height: 4px !important; }
+#radar-score-slider .rc-slider-track { background: #00e5ff !important; height: 4px !important; }
+#radar-score-slider .rc-slider-handle {
+  width: 16px !important; height: 16px !important; margin-top: -6px !important;
+  background: #0d1117 !important; border: 2px solid #00e5ff !important;
+  box-shadow: 0 0 0 3px rgba(0,229,255,0.22) !important; opacity: 1 !important;
+}
+#radar-score-slider .rc-slider-mark-text {
+  color: #a8bcd0 !important; font-size: 10px !important;
+  font-family: "JetBrains Mono", monospace !important;
+}
+.rc-slider-tooltip-inner {
+  background: #1a2234 !important; color: #e8edf5 !important;
+  border: 1px solid #00e5ff !important; border-radius: 4px !important;
+  font-size: 11px !important; font-weight: 700 !important;
+  font-family: "JetBrains Mono", monospace !important;
+  padding: 3px 8px !important;
+}
+.rc-slider-tooltip-arrow { border-top-color: #00e5ff !important; }
 
 /* ── 21. Strategic Report Markdown Viewer ──────────────────────── */
 .report-markdown {

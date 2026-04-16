@@ -643,52 +643,70 @@ def _tab_radar() -> html.Div:
                 dcc.Graph(id="radar-chart", config={"displayModeBar": False}),
             ], className="chart-card"), md=9),
         ], className="g-3"),
+        dbc.Row([
+            dbc.Col(html.Div(id="radar-table-container", style={"marginTop": "20px"}), md=12),
+        ], className="g-3"),
+    ])
+
+
+def _row(s: Signal) -> html.Tr:
+    """Module-level row builder for the Signal Feed table."""
+    return html.Tr([
+        html.Td(s.date_ingested.strftime("%Y-%m-%d")),
+        html.Td(html.Span(_DIM_PILL_CODE.get(s.pestel_dimension.value, "?"),
+                          className=f"dim-pill dp-{_DIM_PILL_CODE.get(s.pestel_dimension.value, 'P')}")),
+        html.Td(html.Div([
+            html.Div(s.title, style={"fontWeight": "600", "color": "#e8edf5"}),
+            html.Div(s.content[:140] + "...", style={"fontSize": "11px", "color": "#7d8fa8"}),
+        ])),
+        html.Td(f"{s.disruption_score:.3f}", style={"fontFamily": "JetBrains Mono",
+                                                   "color": _SEV_COLOUR.get(_sev(s.disruption_score))}),
+        html.Td(html.A("↗", href=s.source_url, target="_blank", className="source-link")),
     ])
 
 
 def _tab_feed() -> html.Div:
     """Signal Feed — raw intelligence data table."""
-    signals = _get_all_signals_cached()
-    # Sort by date descending
-    signals = sorted(signals, key=lambda s: s.date_ingested, reverse=True)
-    stats   = _db_stats_cached()
-    by_dim  = stats.get("by_dimension", {})
-
-    def _row(s: Signal):
-        col = _DIM_COLOUR.get(s.pestel_dimension.value, "#9cb3c9")
-        return html.Tr([
-            html.Td(s.date_ingested.strftime("%Y-%m-%d")),
-            html.Td(html.Span(_DIM_PILL_CODE.get(s.pestel_dimension.value, "?"),
-                              className=f"dim-pill dp-{_DIM_PILL_CODE.get(s.pestel_dimension.value, 'P')}")),
-            html.Td(html.Div([
-                html.Div(s.title, style={"fontWeight": "600", "color": "#e8edf5"}),
-                html.Div(s.content[:140] + "...", style={"fontSize": "11px", "color": "#7d8fa8"}),
-            ])),
-            html.Td(f"{s.disruption_score:.3f}", style={"fontFamily": "JetBrains Mono",
-                                                       "color": _SEV_COLOUR.get(_sev(s.disruption_score))}),
-            html.Td(html.A("↗", href=s.source_url, target="_blank", className="source-link")),
-        ])
-
-    table = html.Table([
-        html.Thead(html.Tr([
-            html.Th("Date"), html.Th("Dim"), html.Th("Signal"), html.Th("Score"), html.Th("Src")
-        ])),
-        html.Tbody([_row(s) for s in signals[:100]]),
-    ], className="war-table")
+    stats  = _db_stats_cached()
+    by_dim = stats.get("by_dimension", {})
 
     return html.Div([
         dbc.Row([
             dbc.Col([
+                html.Div([
+                    dcc.Dropdown(
+                        id="feed-sort-dropdown",
+                        options=[
+                            {"label": "Newest First",       "value": "newest"},
+                            {"label": "Highest Disruption", "value": "score_desc"},
+                            {"label": "Lowest Disruption",  "value": "score_asc"},
+                        ],
+                        value="newest", clearable=False,
+                        className="dark-dropdown",
+                        style={"width": "200px"},
+                    ),
+                    dcc.Dropdown(
+                        id="feed-dim-dropdown",
+                        options=[{"label": "All Dimensions", "value": "ALL"}] +
+                                [{"label": d, "value": d} for d in
+                                 ["POLITICAL", "ECONOMIC", "SOCIAL",
+                                  "TECHNOLOGICAL", "ENVIRONMENTAL", "LEGAL"]],
+                        value="ALL", clearable=False,
+                        className="dark-dropdown",
+                        style={"width": "220px"},
+                    ),
+                ], style={"display": "flex", "gap": "12px", "marginBottom": "14px", "flexWrap": "wrap"}),
                 html.Div(
-                    f"{len(signals)} signal(s) · sorted newest first · live from Astra DB",
+                    id="feed-count-label",
                     style={"fontSize": "11px", "color": "#e8edf5", "marginBottom": "16px"},
                 ),
-                html.Div(
-                    table if signals else html.P(
-                        "No signals. Run the Scout to ingest data.",
-                        style={"color": "#e8edf5", "fontSize": "12px"},
-                    ),
-                ),
+                html.Table([
+                    html.Thead(html.Tr([
+                        html.Th("Date"), html.Th("Dim"), html.Th("Signal"),
+                        html.Th("Score"), html.Th("Src"),
+                    ])),
+                    html.Tbody([], id="feed-table-body"),
+                ], className="war-table"),
             ], md=8),
             dbc.Col(html.Div([
                 html.Div("DATABASE", className="section-label"),
@@ -1767,18 +1785,74 @@ def render_tab(tab: str, _i: int, _n: int, history: list) -> html.Div:
 
 
 @app.callback(
-    Output("radar-chart",       "figure"),
-    Input("radar-dim-filter",   "value"),
-    Input("radar-score-slider", "value"),
-    Input("interval-30s",       "n_intervals"),
-    Input("refresh-btn",        "n_clicks"),
+    Output("radar-chart",            "figure"),
+    Output("radar-table-container",  "children"),
+    Input("radar-dim-filter",        "value"),
+    Input("radar-score-slider",      "value"),
+    Input("interval-30s",            "n_intervals"),
+    Input("refresh-btn",             "n_clicks"),
 )
-def update_radar(dim_filter: str, min_score: float, _i: int, _n: int) -> go.Figure:
+def update_radar(dim_filter: str, min_score: float, _i: int, _n: int):
     try:
-        return _chart_radar(_get_all_signals_cached(), dim_filter or "All", min_score or 0.50)
+        signals  = _get_all_signals_cached()
+        fig      = _chart_radar(signals, dim_filter or "All", min_score or 0.50)
+        filtered = [s for s in signals
+                    if (dim_filter in (None, "All") or s.pestel_dimension.value == dim_filter)
+                    and s.disruption_score >= (min_score or 0.50)]
+        filtered.sort(key=lambda s: s.disruption_score, reverse=True)
+        if not filtered:
+            table = html.Div("No signals match current filters.",
+                             style={"fontSize": "11px", "color": "#6a8099", "padding": "12px 0"})
+        else:
+            table = html.Table([
+                html.Thead(html.Tr([
+                    html.Th("Dim"), html.Th("Signal Title"), html.Th("Score"), html.Th("Src"),
+                ])),
+                html.Tbody([
+                    html.Tr([
+                        html.Td(html.Span(
+                            _DIM_PILL_CODE.get(s.pestel_dimension.value, "?"),
+                            className=f"dim-pill dp-{_DIM_PILL_CODE.get(s.pestel_dimension.value, 'P')}",
+                        )),
+                        html.Td(s.title, style={"color": "#e8edf5", "fontSize": "12px"}),
+                        html.Td(f"{s.disruption_score:.3f}",
+                                style={"fontFamily": "JetBrains Mono, monospace", "fontSize": "11px",
+                                       "color": _SEV_COLOUR.get(_sev(s.disruption_score))}),
+                        html.Td(html.A("↗ Source", href=s.source_url, target="_blank",
+                                       className="source-link")),
+                    ]) for s in filtered[:50]
+                ]),
+            ], className="war-table")
+        return fig, table
     except Exception as exc:
         log.error("update_radar crashed: %s", exc)
-        return go.Figure()
+        return go.Figure(), html.Div()
+
+
+@app.callback(
+    Output("feed-table-body",  "children"),
+    Output("feed-count-label", "children"),
+    Input("feed-sort-dropdown",  "value"),
+    Input("feed-dim-dropdown",   "value"),
+    Input("interval-30s",        "n_intervals"),
+    Input("refresh-btn",         "n_clicks"),
+)
+def update_feed(sort_by: str, dim_filter: str, _i: int, _n: int):
+    try:
+        signals = _get_all_signals_cached()
+        if dim_filter and dim_filter != "ALL":
+            signals = [s for s in signals if s.pestel_dimension.value == dim_filter]
+        if sort_by == "score_desc":
+            signals = sorted(signals, key=lambda s: s.disruption_score, reverse=True)
+        elif sort_by == "score_asc":
+            signals = sorted(signals, key=lambda s: s.disruption_score)
+        else:
+            signals = sorted(signals, key=lambda s: s.date_ingested, reverse=True)
+        label = f"{len(signals)} signal(s) · {(sort_by or 'newest').replace('_', ' ')} · live from Astra DB"
+        return [_row(s) for s in signals[:100]], label
+    except Exception as exc:
+        log.error("update_feed crashed: %s", exc)
+        return [], "Error loading signals."
 
 
 @app.callback(
