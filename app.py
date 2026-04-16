@@ -1825,8 +1825,8 @@ def update_radar(dim_filter: str, min_score: float, _i: int, _n: int):
             ], className="war-table")
         return fig, table
     except Exception as exc:
-        log.error("update_radar crashed: %s", exc)
-        return go.Figure(), html.Div()
+        log.error("update_radar crashed: %s", exc, exc_info=True)
+        return go.Figure(), html.Div("Error loading radar table.")
 
 
 @app.callback(
@@ -1851,8 +1851,8 @@ def update_feed(sort_by: str, dim_filter: str, _i: int, _n: int):
         label = f"{len(signals)} signal(s) · {(sort_by or 'newest').replace('_', ' ')} · live from Astra DB"
         return [_row(s) for s in signals[:100]], label
     except Exception as exc:
-        log.error("update_feed crashed: %s", exc)
-        return [], "Error loading signals."
+        log.error("update_feed crashed: %s", exc, exc_info=True)
+        return [], f"Error loading signals: {exc}"
 
 
 @app.callback(

@@ -629,82 +629,67 @@ html, body {
 .js-plotly-plot .plotly, .plot-container { background: transparent !important; }
 .modebar-container { display: none !important; }
 
-/* ── 20. Nuclear Visibility Fix — High Contrast (Black on White) ── */
+/* ── 20. Total Global Visibility Fix — High Contrast Overlay ── */
 
 /* 
- * We target the IDs specifically to override Dash/Bootstrap/HuggingFace defaults.
- * Requirement: Black text on White bar.
+ * Apply high-contrast (Black text on White bar) to ALL dropdowns globally.
+ * This guarantees visibility even if IDs are missed or environment overrides occur.
  */
-
-#radar-dim-filter .Select-control,
-#reports-dropdown .Select-control,
-#lens-topic-dropdown .Select-control,
-#feed-sort-dropdown .Select-control,
-#feed-dim-dropdown .Select-control {
+.Select-control,
+.dark-dropdown .Select-control,
+.Select-value-label,
+.Select-value,
+.Select-placeholder {
   background-color: #ffffff !important;
   background: #ffffff !important;
-  border: 1px solid #ced4da !important;
-  border-radius: 6px !important;
-  min-height: 36px !important;
-  box-shadow: none !important;
+  color: #000000 !important;
+  border-color: #ced4da !important;
 }
 
-/* Force the selected value text to BLACK */
-#radar-dim-filter .Select-value-label,
-#reports-dropdown .Select-value-label,
-#lens-topic-dropdown .Select-value-label,
-#feed-sort-dropdown .Select-value-label,
-#feed-dim-dropdown .Select-value-label,
-#radar-dim-filter .Select-value,
-#reports-dropdown .Select-value,
-#lens-topic-dropdown .Select-value,
-#feed-sort-dropdown .Select-value,
-#feed-dim-dropdown .Select-value {
+/* Force text inside the dropdown bar to be BLACK */
+.Select-value-label, 
+.Select-value,
+.Select--single > .Select-control .Select-value .Select-value-label,
+.Select--multi > .Select-control .Select-value .Select-value-label {
   color: #000000 !important;
   font-weight: 700 !important;
 }
 
 /* Placeholder — Dark Gray */
-#radar-dim-filter .Select-placeholder,
-#reports-dropdown .Select-placeholder,
-#lens-topic-dropdown .Select-placeholder,
-#feed-sort-dropdown .Select-placeholder,
-#feed-dim-dropdown .Select-placeholder {
+.Select-placeholder {
   color: #555555 !important;
 }
 
-/* Dropdown Menu (Open State) — Dark background with light text for consistency */
+/* Open Menu — Dark theme with light text for premium look */
 .Select-menu-outer {
   background-color: #131922 !important;
   border: 1px solid rgba(255,255,255,0.2) !important;
-  z-index: 9999 !important;
 }
 .Select-option {
   color: #e8edf5 !important;
-  background: transparent !important;
 }
 .Select-option.is-focused {
   background: rgba(255,255,255,0.1) !important;
-  color: #ffffff !important;
 }
 
 /* ── DCC Slider — High Contrast ── */
 
-/* Marks under the slider */
 #radar-score-slider .rc-slider-mark-text {
   color: #ffffff !important;
   font-weight: 700 !important;
 }
 
-/* Floating tooltip when dragging — Black background / White text */
-.rc-slider-tooltip-inner {
+/* Tooltip — Forced visibility */
+.rc-slider-tooltip-inner,
+.rc-slider-tooltip-content {
   background-color: #000000 !important;
   color: #ffffff !important;
   border: 1px solid #00e5ff !important;
   font-weight: 800 !important;
   opacity: 1 !important;
 }
-#radar-score-slider .rc-slider-tooltip-arrow {
+
+.rc-slider-tooltip-arrow {
   border-top-color: #000000 !important;
 }
 
