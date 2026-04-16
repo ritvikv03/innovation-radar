@@ -626,10 +626,7 @@ def _tab_radar() -> html.Div:
                     id="radar-score-slider",
                     min=0, max=1, step=0.05,
                     value=0.50,
-                    marks={0: {"label": "0", "style": {"color": "#a8bcd0"}},
-                           0.50: {"label": "0.50", "style": {"color": "#a8bcd0"}},
-                           0.75: {"label": "0.75", "style": {"color": "#ffab00"}},
-                           1: {"label": "1", "style": {"color": "#a8bcd0"}}},
+                    marks={0: "0", 0.50: "0.50", 0.75: "0.75", 1: "1"},
                     tooltip={"placement": "bottom", "always_visible": False},
                     className="dark-slider",
                 ),
@@ -995,18 +992,21 @@ def _render_causal_chains() -> list:
         )]
     items = []
     for c in chains:
-        arrow_chain = " → ".join(
-            f'<span style="color:{_CAT_COLOUR.get(p, "#7d8fa8")}">{p[:3]}</span>'
-            for p in c["chain"]
-        )
+        chain_parts = c["chain"]
+        arrow_chain_nodes: list = []
+        for i, p in enumerate(chain_parts):
+            arrow_chain_nodes.append(
+                html.Span(p[:3], style={"color": _CAT_COLOUR.get(p, "#7d8fa8")})
+            )
+            if i < len(chain_parts) - 1:
+                arrow_chain_nodes.append(" → ")
         items.append(html.Div([
             html.Div(
                 f"depth {c['depth']}  ·  {c['predicate']}",
                 style={"fontSize": "9px", "color": "#e8edf5", "fontFamily": "JetBrains Mono, monospace"},
             ),
             html.Div(
-                dangerously_allow_html=True,
-                children=arrow_chain,
+                arrow_chain_nodes,
                 style={"fontSize": "10px", "marginTop": "2px"},
             ),
         ], style={"marginBottom": "8px", "paddingLeft": "4px",

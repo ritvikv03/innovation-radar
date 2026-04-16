@@ -633,43 +633,61 @@ html, body {
 
 /* 
  * Apply high-contrast (Black text on White bar) to ALL dropdowns globally.
- * This guarantees visibility even if IDs are missed or environment overrides occur.
+ * We use partial class selectors to catch modern Dash/react-select structures.
  */
+[class*="-ValueContainer"],
+[class*="-singleValue"],
+[class*="-placeholder"],
+[class*="-control"],
 .Select-control,
-.dark-dropdown .Select-control,
-.Select-value-label,
-.Select-value,
-.Select-placeholder {
+.dark-dropdown .Select-control {
   background-color: #ffffff !important;
   background: #ffffff !important;
   color: #000000 !important;
   border-color: #ced4da !important;
+  border-radius: 6px !important;
 }
 
-/* Force text inside the dropdown bar to be BLACK */
+/* Force specific text elements to BLACK */
+[class*="-singleValue"],
 .Select-value-label, 
-.Select-value,
-.Select--single > .Select-control .Select-value .Select-value-label,
-.Select--multi > .Select-control .Select-value .Select-value-label {
+.Select-value {
   color: #000000 !important;
   font-weight: 700 !important;
+  font-family: inherit !important;
+}
+
+/* Force Chevron and Clear icons to be visible (Dark Gray) */
+[class*="-IndicatorContainer"] svg,
+.Select-arrow-zone svg,
+.Select-arrow {
+  fill: #333333 !important;
+  color: #333333 !important;
 }
 
 /* Placeholder — Dark Gray */
+[class*="-placeholder"],
 .Select-placeholder {
   color: #555555 !important;
+  opacity: 1 !important;
 }
 
 /* Open Menu — Dark theme with light text for premium look */
+[class*="-menu"],
 .Select-menu-outer {
   background-color: #131922 !important;
   border: 1px solid rgba(255,255,255,0.2) !important;
+  z-index: 9999 !important;
 }
+[class*="-option"],
 .Select-option {
   color: #e8edf5 !important;
+  background-color: transparent !important;
 }
+[class*="-option"]:hover,
 .Select-option.is-focused {
-  background: rgba(255,255,255,0.1) !important;
+  background-color: rgba(255,255,255,0.1) !important;
+  color: #ffffff !important;
 }
 
 /* ── DCC Slider — High Contrast ── */
