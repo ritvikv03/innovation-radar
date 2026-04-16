@@ -1040,10 +1040,11 @@ def _render_inferred_relationships() -> list:
         hops    = t.get("metadata", {}).get("hop_count", 0)
         subj    = t.get("subject", {}).get("label", "?")
         obj     = t.get("object", {}).get("label", "?")
-        arrow   = " → ".join(
-            f'<span style="color:{_CAT_COLOUR.get(p, "#7d8fa8")}">{p[:3]}</span>'
-            for p in chain
-        )
+        arrow_nodes: list = []
+        for i, p in enumerate(chain):
+            arrow_nodes.append(html.Span(p[:3], style={"color": _CAT_COLOUR.get(p, "#7d8fa8")}))
+            if i < len(chain) - 1:
+                arrow_nodes.append(" → ")
         items.append(html.Div([
             html.Div(
                 f"{hops}-hop cascade",
@@ -1051,8 +1052,7 @@ def _render_inferred_relationships() -> list:
                        "fontFamily": "JetBrains Mono, monospace"},
             ),
             html.Div(
-                dangerously_allow_html=True,
-                children=arrow,
+                arrow_nodes,
                 style={"fontSize": "10px", "marginTop": "2px"},
             ),
             html.Div(
