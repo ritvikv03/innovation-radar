@@ -636,76 +636,83 @@ html, body {
  * Requirement: Black text on White bar for all tabs.
  */
 
-#radar-dim-filter,
-#reports-dropdown,
-#lens-topic-dropdown,
-#feed-sort-dropdown,
-#feed-dim-dropdown {
-  background-color: #ffffff !important;
-  border-radius: 6px !important;
-}
-
-/* Force EVERY internal container and text element to be white/black */
-#radar-dim-filter [class*="-control"],
-#reports-dropdown [class*="-control"],
-#lens-topic-dropdown [class*="-control"],
-#feed-sort-dropdown [class*="-control"],
-#feed-dim-dropdown [class*="-control"],
-#radar-dim-filter [class*="-ValueContainer"],
-#reports-dropdown [class*="-ValueContainer"],
-#lens-topic-dropdown [class*="-ValueContainer"],
-#feed-sort-dropdown [class*="-ValueContainer"],
-#feed-dim-dropdown [class*="-ValueContainer"],
-.Select-control,
-.dark-dropdown .Select-control {
+.dark-dropdown .Select-control,
+#radar-dim-filter .Select-control,
+#reports-dropdown .Select-control,
+#lens-topic-dropdown .Select-control,
+#feed-sort-dropdown .Select-control,
+#feed-dim-dropdown .Select-control {
   background-color: #ffffff !important;
   background: #ffffff !important;
+  border-radius: 6px !important;
   border-color: #ced4da !important;
-  color: #000000 !important;
 }
 
-/* Target the selected value display specifically */
-#radar-dim-filter [class*="-singleValue"],
-#reports-dropdown [class*="-singleValue"],
-#lens-topic-dropdown [class*="-singleValue"],
-#feed-sort-dropdown [class*="-singleValue"],
-#feed-dim-dropdown [class*="-singleValue"],
-.Select-value-label, 
-.Select-value {
+/* Target the selected value display and placeholder with maximum specificity */
+.dark-dropdown .Select-value,
+.dark-dropdown .Select-value-label,
+.dark-dropdown .Select-placeholder,
+#radar-dim-filter .Select-value,
+#radar-dim-filter .Select-value-label,
+#radar-dim-filter .Select-placeholder,
+#reports-dropdown .Select-value,
+#reports-dropdown .Select-value-label,
+#reports-dropdown .Select-placeholder,
+#lens-topic-dropdown .Select-value,
+#lens-topic-dropdown .Select-value-label,
+#lens-topic-dropdown .Select-placeholder,
+#feed-sort-dropdown .Select-value,
+#feed-sort-dropdown .Select-value-label,
+#feed-sort-dropdown .Select-placeholder,
+#feed-dim-dropdown .Select-value,
+#feed-dim-dropdown .Select-value-label,
+#feed-dim-dropdown .Select-placeholder {
   color: #000000 !important;
   font-weight: 700 !important;
 }
 
 /* Force Chevron and Clear icons to be dark */
-#radar-dim-filter [class*="-IndicatorContainer"] svg,
-#reports-dropdown [class*="-IndicatorContainer"] svg,
-#lens-topic-dropdown [class*="-IndicatorContainer"] svg,
-#feed-sort-dropdown [class*="-IndicatorContainer"] svg,
-#feed-dim-dropdown [class*="-IndicatorContainer"] svg {
+.dark-dropdown .Select-arrow,
+.dark-dropdown .Select-clear,
+.dark-dropdown svg,
+#radar-dim-filter .Select-arrow,
+#reports-dropdown .Select-arrow,
+#lens-topic-dropdown .Select-arrow,
+#feed-sort-dropdown .Select-arrow,
+#feed-dim-dropdown .Select-arrow {
   fill: #1a1a1a !important;
   color: #1a1a1a !important;
 }
 
 /* Open Menu — Standard premium dark theme with light text */
-#radar-dim-filter [class*="-menu"],
-#reports-dropdown [class*="-menu"],
-#lens-topic-dropdown [class*="-menu"],
-#feed-sort-dropdown [class*="-menu"],
-#feed-dim-dropdown [class*="-menu"],
-.Select-menu-outer {
+.dark-dropdown .Select-menu-outer,
+#radar-dim-filter .Select-menu-outer,
+#reports-dropdown .Select-menu-outer,
+#lens-topic-dropdown .Select-menu-outer,
+#feed-sort-dropdown .Select-menu-outer,
+#feed-dim-dropdown .Select-menu-outer {
   background-color: #0f1623 !important;
   border: 1px solid rgba(0,229,255,0.2) !important;
   z-index: 9999 !important;
 }
 
 /* Force menu options to be readable */
-[class*="-option"],
-.Select-option {
+.dark-dropdown .Select-option,
+#radar-dim-filter .Select-option,
+#reports-dropdown .Select-option,
+#lens-topic-dropdown .Select-option,
+#feed-sort-dropdown .Select-option,
+#feed-dim-dropdown .Select-option {
   color: #e8edf5 !important;
   background-color: transparent !important;
 }
-[class*="-option"]:hover,
-.Select-option.is-focused {
+
+.dark-dropdown .Select-option.is-focused,
+#radar-dim-filter .Select-option.is-focused,
+#reports-dropdown .Select-option.is-focused,
+#lens-topic-dropdown .Select-option.is-focused,
+#feed-sort-dropdown .Select-option.is-focused,
+#feed-dim-dropdown .Select-option.is-focused {
   background-color: rgba(0,229,255,0.15) !important;
   color: #ffffff !important;
 }
