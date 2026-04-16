@@ -1566,6 +1566,36 @@ app.index_string = """<!DOCTYPE html>
         <title>{%title%}</title>
         {%favicon%}
         {%css%}
+        <style>
+            /* Anti-Cache Nuclear Override for Hugging Face Spaces */
+            .dark-dropdown .Select-control,
+            .dark-dropdown .Select-control .Select-value {
+                background-color: #ffffff !important;
+            }
+            .dark-dropdown .Select-value-label,
+            .dark-dropdown .Select-placeholder,
+            .dark-dropdown .Select-value {
+                color: #000000 !important;
+                font-weight: 800 !important;
+                opacity: 1 !important;
+            }
+            .dark-dropdown .Select-arrow {
+                fill: #000000 !important;
+                color: #000000 !important;
+            }
+            .dark-dropdown .Select-menu-outer {
+                background-color: #0f1623 !important;
+                border: 1px solid rgba(0,229,255,0.2) !important;
+            }
+            .dark-dropdown .Select-option {
+                color: #e8edf5 !important;
+                background-color: #0f1623 !important;
+            }
+            .dark-dropdown .Select-option.is-focused {
+                background-color: rgba(0,229,255,0.15) !important;
+                color: #ffffff !important;
+            }
+        </style>
     </head>
     <body>
         {%app_entry%}
@@ -1677,41 +1707,9 @@ topbar = html.Header([
     html.Div(id="topbar-ts", className="topbar-ts"),
 ], className="war-topbar")
 
-_INLINE_CSS = """
-/* Anti-Cache Nuclear Override for Hugging Face Spaces */
-.dark-dropdown .Select-control,
-.dark-dropdown .Select-control .Select-value {
-    background-color: #ffffff !important;
-}
-.dark-dropdown .Select-value-label,
-.dark-dropdown .Select-placeholder,
-.dark-dropdown .Select-value {
-    color: #000000 !important;
-    font-weight: 800 !important;
-    opacity: 1 !important;
-}
-.dark-dropdown .Select-arrow {
-    fill: #000000 !important;
-    color: #000000 !important;
-}
-.dark-dropdown .Select-menu-outer {
-    background-color: #0f1623 !important;
-    border: 1px solid rgba(0,229,255,0.2) !important;
-}
-.dark-dropdown .Select-option {
-    color: #e8edf5 !important;
-    background-color: #0f1623 !important;
-}
-.dark-dropdown .Select-option.is-focused {
-    background-color: rgba(0,229,255,0.15) !important;
-    color: #ffffff !important;
-}
-"""
-
 # ── Full Layout ────────────────────────────────────────────────
 def _layout() -> html.Div:
     return html.Div([
-        html.Style(_INLINE_CSS),
         sidebar,
         html.Div([
             topbar,
