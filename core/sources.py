@@ -28,18 +28,21 @@ PESTEL_SOURCES: list[dict] = [
         "dimension":   "POLITICAL",
         "source_name": "Politico EU Agriculture",
         "scrape_mode": "rss",
+        "source_type": "trade_news",
     },
     {
         "url":         "https://www.politico.eu/feed/",
         "dimension":   "POLITICAL",
         "source_name": "Politico EU",
         "scrape_mode": "rss",
+        "source_type": "trade_news",
     },
     {
         "url":         "https://ec.europa.eu/commission/presscorner/api/documents?keyword=agriculture&institution=COMM&documenttype=IP&limit=10&sortby=date",
         "dimension":   "POLITICAL",
         "source_name": "EC Agriculture Press Releases",
         "scrape_mode": "page",
+        "source_type": "regulatory",
     },
 
     # ── ECONOMIC — commodity prices, farm income, AGCO financials
@@ -48,24 +51,28 @@ PESTEL_SOURCES: list[dict] = [
         "dimension":   "ECONOMIC",
         "source_name": "Euractiv Agriculture",
         "scrape_mode": "rss",
+        "source_type": "trade_news",
     },
     {
         "url":         "https://www.agweb.com/rss/news",
         "dimension":   "ECONOMIC",
         "source_name": "AgWeb Farm News",
         "scrape_mode": "rss",
+        "source_type": "trade_news",
     },
     {
         "url":         "https://www.farminguk.com/rss/news.xml",
         "dimension":   "ECONOMIC",
         "source_name": "Farming UK — Farm Business",
         "scrape_mode": "rss",
+        "source_type": "trade_news",
     },
     {
         "url":         "https://www.agriexpo.online/news/",
         "dimension":   "ECONOMIC",
         "source_name": "AgriExpo Industry News",
         "scrape_mode": "page",
+        "source_type": "trade_news",
     },
 
     # ── TECHNOLOGICAL — precision ag, autonomy, connectivity ───
@@ -74,30 +81,35 @@ PESTEL_SOURCES: list[dict] = [
         "dimension":   "TECHNOLOGICAL",
         "source_name": "Agriland Machinery",
         "scrape_mode": "page",
+        "source_type": "trade_news",
     },
     {
         "url":         "https://www.precisionag.com/feed/",
         "dimension":   "TECHNOLOGICAL",
         "source_name": "Precision Ag Magazine",
         "scrape_mode": "rss",
+        "source_type": "academic",
     },
     {
         "url":         "https://www.agritechfuture.com/feed/",
         "dimension":   "TECHNOLOGICAL",
         "source_name": "AgriTech Future",
         "scrape_mode": "rss",
+        "source_type": "trade_news",
     },
     {
         "url":         "https://cordis.europa.eu/search/en?q=precision+farming+autonomous&p=1&num=5&srt=Relevance:decreasing",
         "dimension":   "TECHNOLOGICAL",
         "source_name": "CORDIS Precision Farming R&D",
         "scrape_mode": "page",
+        "source_type": "regulatory",
     },
     {
         "url":         "https://www.dtnpf.com/agriculture/web/ag/crops/article/2024/01/01/precision-ag-technology-trends",
         "dimension":   "TECHNOLOGICAL",
         "source_name": "DTN Precision Ag Trends",
         "scrape_mode": "page",
+        "source_type": "trade_news",
     },
 
     # ── LEGAL — emissions standards, machinery regs, CAP ───────
@@ -106,18 +118,21 @@ PESTEL_SOURCES: list[dict] = [
         "dimension":   "LEGAL",
         "source_name": "EUR-Lex Machinery Emissions",
         "scrape_mode": "page",
+        "source_type": "regulatory",
     },
     {
         "url":         "https://eur-lex.europa.eu/search.html?qid=1&text=CAP+strategic+plan+2026&scope=EURLEX&type=quick&lang=en",
         "dimension":   "LEGAL",
         "source_name": "EUR-Lex CAP 2026",
         "scrape_mode": "page",
+        "source_type": "regulatory",
     },
     {
         "url":         "https://www.euromachineryparts.com/news/",
         "dimension":   "LEGAL",
         "source_name": "Euro Machinery Parts & Regulation",
         "scrape_mode": "page",
+        "source_type": "regulatory",
     },
 
     # ── ENVIRONMENTAL — Green Deal, sustainability, soil health ─
@@ -126,12 +141,14 @@ PESTEL_SOURCES: list[dict] = [
         "dimension":   "ENVIRONMENTAL",
         "source_name": "EEA Agriculture & Environment",
         "scrape_mode": "page",
+        "source_type": "regulatory",
     },
     {
         "url":         "https://www.agriland.ie/farming-news/environment/",
         "dimension":   "ENVIRONMENTAL",
         "source_name": "Agriland Environment",
         "scrape_mode": "page",
+        "source_type": "trade_news",
     },
 
     # ── SOCIAL — farmer sentiment, protests, labour, adoption ──
@@ -140,18 +157,21 @@ PESTEL_SOURCES: list[dict] = [
         "dimension":   "SOCIAL",
         "source_name": "Copa-Cogeca Farmer Union",
         "scrape_mode": "page",
+        "source_type": "trade_news",
     },
     {
         "url":         "https://www.farmersweeekly.co.uk/feed",
         "dimension":   "SOCIAL",
         "source_name": "Farmers Weekly",
         "scrape_mode": "rss",
+        "source_type": "trade_news",
     },
     {
         "url":         "https://www.agriculture.com/rss-feeds",
         "dimension":   "SOCIAL",
         "source_name": "Agriculture.com Farmer Voice",
         "scrape_mode": "page",
+        "source_type": "trade_news",
     },
 ]
 

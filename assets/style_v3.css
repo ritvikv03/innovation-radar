@@ -164,7 +164,7 @@ html, body {
   border-top: 1px solid var(--card-border);
   font-family: var(--mono);
   font-size: 9.5px;
-  color: #8a9bb5;
+  color: var(--lo);
   line-height: 2;
 }
 
@@ -581,30 +581,31 @@ html, body {
   background: rgba(255, 23, 68, 0.05);
   border: 1px solid rgba(255, 23, 68, 0.2);
   border-left: 3px solid var(--red);
-  border-radius: var(--r-md);
-  padding: 18px 20px;
-  height: 100%;
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  margin-bottom: 6px;
   transition: border-color 0.2s, background 0.2s;
 }
+.urgency-card:last-child { margin-bottom: 0; }
 .urgency-card:hover {
   background: rgba(255, 23, 68, 0.09);
   border-color: rgba(255, 23, 68, 0.4);
 }
 .urgency-score {
   font-family: var(--mono);
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--red);
   line-height: 1;
   letter-spacing: -0.02em;
-  margin: 8px 0 6px;
+  margin: 4px 0 4px;
 }
 .urgency-title {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--hi);
-  line-height: 1.45;
-  margin-bottom: 8px;
+  line-height: 1.4;
+  margin-bottom: 0;
 }
 
 /* ── 18. Radar Filters Panel ───────────────────────────────────── */
@@ -629,193 +630,75 @@ html, body {
 .js-plotly-plot .plotly, .plot-container { background: transparent !important; }
 .modebar-container { display: none !important; }
 
-/* ── 20. Total Nuclear Visibility Fix — ID-Specific High Contrast ── */
+/* ── 20. DCC Interactive Components ───────────────────────────── */
 
-/* 
- * We target IDs specifically to achieve the highest possible specificity.
- * Requirement: Black text on White bar for all tabs.
- */
+/* Dropdown button — Dash supplies a white background; text must be dark */
+button.dash-dropdown { border-radius: 6px !important; }
 
-.dark-dropdown .Select-control,
-#radar-dim-filter .Select-control,
-#reports-dropdown .Select-control,
-#lens-topic-dropdown .Select-control,
-#feed-sort-dropdown .Select-control,
-#feed-dim-dropdown .Select-control {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
-  border-radius: 6px !important;
-  border-color: #ced4da !important;
-}
-
-/* Target the selected value display and placeholder with maximum specificity */
-.dark-dropdown .Select-value,
-.dark-dropdown .Select-value-label,
-.dark-dropdown .Select-placeholder,
-#radar-dim-filter .Select-value,
-#radar-dim-filter .Select-value-label,
-#radar-dim-filter .Select-placeholder,
-#reports-dropdown .Select-value,
-#reports-dropdown .Select-value-label,
-#reports-dropdown .Select-placeholder,
-#lens-topic-dropdown .Select-value,
-#lens-topic-dropdown .Select-value-label,
-#lens-topic-dropdown .Select-placeholder,
-#feed-sort-dropdown .Select-value,
-#feed-sort-dropdown .Select-value-label,
-#feed-sort-dropdown .Select-placeholder,
-#feed-dim-dropdown .Select-value,
-#feed-dim-dropdown .Select-value-label,
-#feed-dim-dropdown .Select-placeholder {
-  color: #000000 !important;
-  font-weight: 700 !important;
-}
-
-/* Force Chevron and Clear icons to be dark */
-.dark-dropdown .Select-arrow,
-.dark-dropdown .Select-clear,
-.dark-dropdown svg,
-#radar-dim-filter .Select-arrow,
-#reports-dropdown .Select-arrow,
-#lens-topic-dropdown .Select-arrow,
-#feed-sort-dropdown .Select-arrow,
-#feed-dim-dropdown .Select-arrow {
-  fill: #1a1a1a !important;
+button.dash-dropdown .dash-dropdown-value-item span,
+button.dash-dropdown .dash-dropdown-placeholder {
   color: #1a1a1a !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
 }
+button.dash-dropdown .dash-dropdown-trigger-icon { color: #1a1a1a !important; }
 
-/* Open Menu — Standard premium dark theme with light text */
-.dark-dropdown .Select-menu-outer,
-#radar-dim-filter .Select-menu-outer,
-#reports-dropdown .Select-menu-outer,
-#lens-topic-dropdown .Select-menu-outer,
-#feed-sort-dropdown .Select-menu-outer,
-#feed-dim-dropdown .Select-menu-outer {
-  background-color: #0f1623 !important;
-  border: 1px solid rgba(0,229,255,0.2) !important;
-  z-index: 9999 !important;
-}
-
-/* Force menu options to be readable */
-.dark-dropdown .Select-option,
-#radar-dim-filter .Select-option,
-#reports-dropdown .Select-option,
-#lens-topic-dropdown .Select-option,
-#feed-sort-dropdown .Select-option,
-#feed-dim-dropdown .Select-option {
-  color: #e8edf5 !important;
-  background-color: transparent !important;
-}
-
-.dark-dropdown .Select-option.is-focused,
-#radar-dim-filter .Select-option.is-focused,
-#reports-dropdown .Select-option.is-focused,
-#lens-topic-dropdown .Select-option.is-focused,
-#feed-sort-dropdown .Select-option.is-focused,
-#feed-dim-dropdown .Select-option.is-focused {
-  background-color: rgba(0,229,255,0.15) !important;
-  color: #ffffff !important;
-}
-
-/* ── DCC Slider — High Contrast ── */
-
-#radar-score-slider .rc-slider-mark-text {
-  color: #ffffff !important;
-  font-weight: 700 !important;
-}
-
-/* Tooltip — Forced visibility */
-.rc-slider-tooltip-inner,
-.rc-slider-tooltip-content {
-  background-color: #000000 !important;
-  color: #ffffff !important;
-  border: 1px solid #00e5ff !important;
-  font-weight: 800 !important;
-  opacity: 1 !important;
-}
-
-.rc-slider-tooltip-arrow {
-  border-top-color: #000000 !important;
-}
-
-/* Search input */
-#radar-dim-filter input,
-#reports-dropdown input,
-#lens-topic-dropdown input,
-#feed-sort-dropdown input,
-#feed-dim-dropdown input {
-  color: #e8edf5 !important;
-  background: transparent !important;
-}
-
-/* Dropdown menu */
-#radar-dim-filter .Select-menu-outer,
-#reports-dropdown .Select-menu-outer,
-#lens-topic-dropdown .Select-menu-outer,
-#feed-sort-dropdown .Select-menu-outer,
-#feed-dim-dropdown .Select-menu-outer {
-  background: #131922 !important;
-  border: 1px solid rgba(0,229,255,0.2) !important;
+/* Open dropdown menu — dark surface */
+.dash-dropdown-options-container {
+  background: var(--surface) !important;
+  border: 1px solid rgba(0, 229, 255, 0.2) !important;
   border-radius: 8px !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.55) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55) !important;
   z-index: 9999 !important;
   margin-top: 3px !important;
 }
-
-/* Options */
-#radar-dim-filter .Select-option,
-#reports-dropdown .Select-option,
-#lens-topic-dropdown .Select-option,
-#feed-sort-dropdown .Select-option,
-#feed-dim-dropdown .Select-option {
-  color: #a8bcd0 !important;
+.dash-dropdown-option {
+  color: var(--mid) !important;
   background: transparent !important;
   font-size: 12px !important;
   padding: 9px 14px !important;
 }
-#radar-dim-filter .Select-option.is-focused,
-#reports-dropdown .Select-option.is-focused,
-#lens-topic-dropdown .Select-option.is-focused,
-#feed-sort-dropdown .Select-option.is-focused,
-#feed-dim-dropdown .Select-option.is-focused,
-#radar-dim-filter .Select-option:hover,
-#reports-dropdown .Select-option:hover,
-#lens-topic-dropdown .Select-option:hover,
-#feed-sort-dropdown .Select-option:hover,
-#feed-dim-dropdown .Select-option:hover {
-  color: #e8edf5 !important;
-  background: rgba(255,255,255,0.07) !important;
+.dash-dropdown-option:hover,
+.dash-dropdown-option.dash-dropdown-option--highlighted {
+  color: var(--hi) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
 }
-#radar-dim-filter .Select-option.is-selected,
-#reports-dropdown .Select-option.is-selected,
-#lens-topic-dropdown .Select-option.is-selected,
-#feed-sort-dropdown .Select-option.is-selected,
-#feed-dim-dropdown .Select-option.is-selected {
-  color: #00e5ff !important;
-  background: rgba(0,229,255,0.1) !important;
+.dash-dropdown-option.dash-dropdown-option--selected {
+  color: var(--cyan) !important;
+  background: rgba(0, 229, 255, 0.1) !important;
   font-weight: 600 !important;
 }
 
-/* ── Slider ──────────────────────────────────────────────────── */
-#radar-score-slider .rc-slider-rail  { background: rgba(255,255,255,0.12) !important; height: 4px !important; }
-#radar-score-slider .rc-slider-track { background: #00e5ff !important; height: 4px !important; }
-#radar-score-slider .rc-slider-handle {
-  width: 16px !important; height: 16px !important; margin-top: -6px !important;
-  background: #0d1117 !important; border: 2px solid #00e5ff !important;
-  box-shadow: 0 0 0 3px rgba(0,229,255,0.22) !important; opacity: 1 !important;
+/* Multi-select tags */
+.dash-dropdown--multi .dash-dropdown-value-item {
+  background: rgba(0, 229, 255, 0.1) !important;
+  border: 1px solid rgba(0, 229, 255, 0.3) !important;
+  border-radius: 4px !important;
+  color: var(--hi) !important;
+  padding: 1px 6px !important;
+  font-size: 11px !important;
 }
-#radar-score-slider .rc-slider-mark-text {
-  color: #a8bcd0 !important; font-size: 10px !important;
-  font-family: "JetBrains Mono", monospace !important;
+
+/* Slider mark labels — white on dark */
+#radar-score-slider .dash-slider-mark,
+.dark-slider .dash-slider-mark {
+  color: var(--hi) !important;
+  font-size: 10px !important;
+  font-family: var(--mono) !important;
 }
-.rc-slider-tooltip-inner {
-  background: #1a2234 !important; color: #e8edf5 !important;
-  border: 1px solid #00e5ff !important; border-radius: 4px !important;
-  font-size: 11px !important; font-weight: 700 !important;
-  font-family: "JetBrains Mono", monospace !important;
-  padding: 3px 8px !important;
+
+/* Slider thumb tooltip */
+#radar-score-slider .dash-slider-tooltip,
+.dark-slider .dash-slider-tooltip {
+  background: var(--raise) !important;
+  border: 1px solid var(--cyan) !important;
+  border-radius: 4px !important;
+  color: var(--hi) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  font-family: var(--mono) !important;
+  padding: 2px 8px !important;
 }
-.rc-slider-tooltip-arrow { border-top-color: #00e5ff !important; }
 
 /* ── 21. Strategic Report Markdown Viewer ──────────────────────── */
 .report-markdown {
@@ -1013,19 +896,7 @@ html, body {
 [data-bs-theme="dark"] .dropdown-item { color: var(--mid); }
 [data-bs-theme="dark"] .dropdown-item:hover { background: rgba(255,255,255,0.05); color: var(--hi); }
 
-/* ── DBC / Bootstrap Button Overrides — force dark-on-light readability ───── */
-/* White-background buttons must have dark text */
-.btn-light, .btn-outline-light,
-.btn-secondary, .btn-outline-secondary,
-.btn-primary, .btn-outline-primary,
-.btn-success, .btn-outline-success,
-.btn-info, .btn-outline-info,
-.btn-warning, .btn-outline-warning,
-.btn-danger, .btn-outline-danger {
-  color: var(--hi) !important;
-}
-
-/* White-background dropdown buttons (common in DBC) */
+/* ── DBC Bootstrap dropdown toggle buttons ─────────────────────── */
 .btn.dropdown-toggle,
 .btn.dropdown-toggle:focus,
 .btn.dropdown-toggle:active {
@@ -1058,20 +929,6 @@ html, body {
   color: var(--cyan) !important;
   background: rgba(0,229,255,0.08) !important;
 }
-
-/* ── DCC Dropdown (React-Select) — comprehensive dark overrides ───────────── */
-/* The inner input text */
-.Select input { color: var(--hi) !important; }
-/* Single-value display */
-.Select-value { color: var(--hi) !important; }
-.Select-value-label { color: var(--hi) !important; }
-/* Multi-value tags */
-.Select--multi .Select-value { background: rgba(0,229,255,0.1) !important; border-color: rgba(0,229,255,0.3) !important; }
-.Select--multi .Select-value-label { color: var(--hi) !important; }
-.Select--multi .Select-value-icon { color: var(--mid) !important; border-color: rgba(255,255,255,0.1) !important; }
-.Select--multi .Select-value-icon:hover { background: rgba(255,23,68,0.15) !important; color: var(--red) !important; }
-/* Clear button */
-.Select-clear-zone { color: var(--mid) !important; }
 
 @media (max-width: 1100px) {
   :root { --sidebar-w: 200px; }
