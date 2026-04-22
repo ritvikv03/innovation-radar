@@ -76,10 +76,10 @@ python run_pipeline.py --url https://example.com/article
 
 | Tab | Purpose |
 |-----|---------|
-| Overview | KPI tiles, urgency matrix, velocity chart, disruption distribution |
+| Overview | KPI tiles, urgency matrix, velocity chart, disruption distribution; Top 3 Signals panel shows the highest-scoring signal from each distinct source |
 | Field Intelligence | Live signal feed with PESTEL filter and semantic search |
 | Radar | Plotly radar chart of disruption scores by dimension |
-| Knowledge Graph | Interactive Cytoscape graph of SPO triples and causal chains |
+| Knowledge Graph | Interactive Cytoscape graph of SPO triples and causal chains; nodes are deduplicated by source URL so multiple signals from the same article produce a single node |
 | Inquisition | LangGraph multi-agent chat for quantitative + synthesis queries |
 | Intelligence Brief | Auto-generated BLUF executive summary with source citations |
 
@@ -130,7 +130,7 @@ Astra DB integration tests skip automatically when `ASTRA_DB_TOKEN` is not set.
 
 ## GitHub Actions — Required Secrets
 
-For the automated daily sweep (`sentinel.yml`) to work, add these three secrets in **Settings → Secrets and variables → Actions**:
+For the automated sweep (`sentinel.yml`) to work, add these three secrets in **Settings → Secrets and variables → Actions**:
 
 | Secret | Value |
 |--------|-------|
@@ -138,7 +138,7 @@ For the automated daily sweep (`sentinel.yml`) to work, add these three secrets 
 | `ASTRA_DB_TOKEN` | Your Astra DB application token |
 | `ASTRA_DB_ENDPOINT` | Your Astra DB API endpoint URL |
 
-The workflow runs daily at midnight UTC and can also be triggered manually via **Actions → Sentinel — Daily Intelligence Sweep → Run workflow**.
+The workflow runs every 6 hours (00:00, 06:00, 12:00, 18:00 UTC) and can also be triggered manually via **Actions → Sentinel — Daily Intelligence Sweep → Run workflow**.
 
 ---
 
