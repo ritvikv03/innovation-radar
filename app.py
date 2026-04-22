@@ -1976,7 +1976,7 @@ def update_sidebar(_i: int, _n: int):
             "background":  "rgba(0,230,118,0.08)" if total else "rgba(255,23,68,0.08)",
         },
     )
-    ts = datetime.now(timezone.utc).strftime("UTC %H:%M:%S · scout every 6h")
+    ts = datetime.now(timezone.utc).strftime("UTC %H:%M:%S · auto-refresh 6h")
     return body, badge, ts
 
 
