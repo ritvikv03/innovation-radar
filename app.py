@@ -14,7 +14,7 @@ Sponsor requirements implemented:
   2. Bold 12M/24M/36M time-horizon rings; Urgency Matrix at Overview top.
   3. Universal strategic LLM prompt — no company-specific copy.
   4. Default radar filter ≥ 0.50 (HIGH+CRITICAL only).
-  5. dcc.Interval wired to DB; sidebar + canvas auto-refresh every 30s.
+  5. dcc.Interval wired to DB; sidebar + canvas auto-refresh every 6h.
 """
 
 from __future__ import annotations
@@ -1757,7 +1757,7 @@ def _layout() -> html.Div:
         dcc.Download(id="export-download"),
         dcc.Download(id="reports-pdf-download"),
         # 30-second auto-refresh (sponsor requirement #5)
-        dcc.Interval(id="interval-30s", interval=30_000, n_intervals=0),
+        dcc.Interval(id="interval-30s", interval=6 * 60 * 60 * 1_000, n_intervals=0),
     ], className="war-shell")
 
 app.layout = _layout()
