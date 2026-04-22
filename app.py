@@ -1741,9 +1741,10 @@ def _layout() -> html.Div:
         ], className="war-main"),
 
         # Persistent state
-        dcc.Store(id="chat-store",    data=[]),
-        dcc.Store(id="signals-store", data=[], storage_type="memory"),  # cross-tab signal cache
+        dcc.Store(id="chat-store",       data=[]),
+        dcc.Store(id="signals-store",    data=[], storage_type="memory"),
         dcc.Store(id="reports-last-selection", data=None),
+        dcc.Store(id="chip-echo-store",  data=""),
         dcc.Download(id="export-download"),
         dcc.Download(id="reports-pdf-download"),
         # 30-second auto-refresh (sponsor requirement #5)
@@ -1801,9 +1802,13 @@ def refresh_signals_store(_i: int, _n: int) -> list[dict]:
 )
 def render_tab(tab: str, _i: int, _n: int, history: list) -> html.Div:
     triggered = callback_context.triggered_id
-    # Chatbot re-renders only on explicit tab switch to avoid clobbering live chat
+    # Chatbot and Knowledge Graph only re-render on explicit tab switch.
+    # Chatbot: avoids clobbering live conversation on interval ticks.
+    # Graph: avoids rerunning the expensive Cytoscape COSE layout every 30s.
     if tab == "chatbot":
         return no_update if triggered != "main-tabs" else _tab_chatbot(history or [])
+    if tab == "graph":
+        return no_update if triggered != "main-tabs" else _tab_graph()
     dispatch = {
         "overview": _tab_overview,
         "radar":    _tab_radar,
@@ -1962,7 +1967,7 @@ def update_sidebar(_i: int, _n: int):
             "background":  "rgba(0,230,118,0.08)" if total else "rgba(255,23,68,0.08)",
         },
     )
-    ts = datetime.now(timezone.utc).strftime("UTC %H:%M:%S · auto-refresh 30s")
+    ts = datetime.now(timezone.utc).strftime("UTC %H:%M:%S · scout every 6h")
     return body, badge, ts
 
 
@@ -1976,7 +1981,7 @@ _CHIP_TEXTS = [
 
 
 @app.callback(
-    Output("chat-input", "value", allow_duplicate=True),
+    Output("chip-echo-store", "data"),
     [Input(f"chip-{i}", "n_clicks") for i in range(5)],
     prevent_initial_call=True,
 )
@@ -1988,6 +1993,15 @@ def _fill_input_from_chip(*_clicks):
     if tid and str(tid).startswith("chip-"):
         return _CHIP_TEXTS[int(str(tid).split("-")[1])]
     return no_update
+
+
+@app.callback(
+    Output("chat-input", "value", allow_duplicate=True),
+    Input("chip-echo-store", "data"),
+    prevent_initial_call=True,
+)
+def _echo_chip_to_input(text: str):
+    return text if text else no_update
 
 
 @app.callback(
