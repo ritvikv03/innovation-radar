@@ -339,30 +339,39 @@ def update_graph(state: GraphState) -> GraphState:
         }
         existing_triple_ids: set[str]      = {t["id"] for t in graph["triples"]}
         existing_triples: list[dict]       = graph["triples"]
+        existing_node_sources: set[str]    = {
+            n["source"] for n in graph.get("nodes", []) if n.get("source")
+        }
 
         # ── Upsert incoming signal as a node ──────────────────────────────────
-        if sig["id"] not in existing_node_ids:
+        _sig_source = sig.get("source_url", "")
+        if sig["id"] not in existing_node_ids and _sig_source not in existing_node_sources:
             graph["nodes"].append({
                 "id":         sig["id"],
                 "label":      _short(sig.get("title", sig["id"])),
                 "category":   sig["pestel_dimension"],
                 "created_at": sig.get("date_ingested", ""),
-                "source":     sig.get("source_url", ""),
+                "source":     _sig_source,
             })
             existing_node_ids.add(sig["id"])
+            if _sig_source:
+                existing_node_sources.add(_sig_source)
 
         # ── Ensure historical signal nodes exist ──────────────────────────────
         for match in state.get("semantic_matches", []):
             hist = match["signal"]
-            if hist["id"] not in existing_node_ids:
+            _hist_source = hist.get("source_url", "")
+            if hist["id"] not in existing_node_ids and _hist_source not in existing_node_sources:
                 graph["nodes"].append({
                     "id":         hist["id"],
                     "label":      _short(hist.get("title", hist["id"])),
                     "category":   hist["pestel_dimension"],
                     "created_at": hist.get("date_ingested", ""),
-                    "source":     hist.get("source_url", ""),
+                    "source":     _hist_source,
                 })
                 existing_node_ids.add(hist["id"])
+                if _hist_source:
+                    existing_node_sources.add(_hist_source)
 
         # ── Write edges (links + triples) ─────────────────────────────────────
         for edge in edges:
