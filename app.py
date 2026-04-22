@@ -1966,6 +1966,30 @@ def update_sidebar(_i: int, _n: int):
     return body, badge, ts
 
 
+_CHIP_TEXTS = [
+    "Which signals should Fendt's sales team lead with in dealer conversations this quarter?",
+    "How should Fendt marketing position the Vario tractor line against CNH and Deere given current EU signals?",
+    "What precision farming trends give AGCO the strongest upsell narrative to existing customers?",
+    "Which regulatory changes create urgency for farmers to upgrade equipment — and how do we message that?",
+    "What competitive threats from John Deere, CNH, or Claas should Fendt sales reps be prepared to counter?",
+]
+
+
+@app.callback(
+    Output("chat-input", "value", allow_duplicate=True),
+    [Input(f"chip-{i}", "n_clicks") for i in range(5)],
+    prevent_initial_call=True,
+)
+def _fill_input_from_chip(*_clicks):
+    ctx = callback_context
+    if not ctx.triggered:
+        return no_update
+    tid = ctx.triggered_id
+    if tid and str(tid).startswith("chip-"):
+        return _CHIP_TEXTS[int(str(tid).split("-")[1])]
+    return no_update
+
+
 @app.callback(
     output=[
         Output("chat-messages", "children"),
@@ -1993,13 +2017,7 @@ def update_sidebar(_i: int, _n: int):
     background=True,
 )
 def send_message(n_send, n_sub, c0, c1, c2, c3, c4, question_val, history_data):
-    chip_texts = [
-        "Which signals should Fendt's sales team lead with in dealer conversations this quarter?",
-        "How should Fendt marketing position the Vario tractor line against CNH and Deere given current EU signals?",
-        "What precision farming trends give AGCO the strongest upsell narrative to existing customers?",
-        "Which regulatory changes create urgency for farmers to upgrade equipment — and how do we message that?",
-        "What competitive threats from John Deere, CNH, or Claas should Fendt sales reps be prepared to counter?",
-    ]
+    chip_texts = _CHIP_TEXTS
 
     question = question_val or ""
     history  = list(history_data or [])
