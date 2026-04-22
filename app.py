@@ -1642,6 +1642,15 @@ def _db_stats_cached() -> dict:
     """Cached DB stats — avoids a full get_all() on every sidebar tick."""
     try:
         signals = _get_all_signals_cached()
+        # Deduplicate by source_url — keep highest disruption_score per source
+        _seen_urls: set[str] = set()
+        _unique: list = []
+        for s in sorted(signals, key=lambda s: s.disruption_score, reverse=True):
+            if s.source_url not in _seen_urls:
+                _seen_urls.add(s.source_url)
+                _unique.append(s)
+        signals = _unique
+
         scores  = [s.disruption_score for s in signals]
         by_dim: dict[str, int] = {}
         for s in signals:
