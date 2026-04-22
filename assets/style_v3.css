@@ -643,29 +643,29 @@ button.dash-dropdown .dash-dropdown-placeholder {
 }
 button.dash-dropdown .dash-dropdown-trigger-icon { color: #1a1a1a !important; }
 
-/* Open dropdown menu — dark surface */
+/* Open dropdown menu — white surface */
 .dash-dropdown-options-container {
-  background: var(--surface) !important;
-  border: 1px solid rgba(0, 229, 255, 0.2) !important;
+  background: #ffffff !important;
+  border: 1px solid #d0d5dd !important;
   border-radius: 8px !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18) !important;
   z-index: 9999 !important;
   margin-top: 3px !important;
 }
 .dash-dropdown-option {
-  color: var(--mid) !important;
+  color: #1a1a1a !important;
   background: transparent !important;
   font-size: 12px !important;
   padding: 9px 14px !important;
 }
 .dash-dropdown-option:hover,
 .dash-dropdown-option.dash-dropdown-option--highlighted {
-  color: var(--hi) !important;
-  background: rgba(255, 255, 255, 0.07) !important;
+  color: #1a1a1a !important;
+  background: #f0f4f8 !important;
 }
 .dash-dropdown-option.dash-dropdown-option--selected {
-  color: var(--cyan) !important;
-  background: rgba(0, 229, 255, 0.1) !important;
+  color: #006a80 !important;
+  background: #e0f7fa !important;
   font-weight: 600 !important;
 }
 
