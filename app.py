@@ -551,7 +551,15 @@ def _tab_overview() -> html.Div:
     """Field Intelligence Overview — KPIs and high-level distribution."""
     signals = _get_all_signals_cached()
     stats   = _db_stats_cached()
-    top3    = sorted(signals, key=lambda s: s.disruption_score, reverse=True)[:3]
+    _sorted = sorted(signals, key=lambda s: s.disruption_score, reverse=True)
+    top3: list = []
+    _seen_sources: set[str] = set()
+    for _s in _sorted:
+        if _s.source_url not in _seen_sources:
+            _seen_sources.add(_s.source_url)
+            top3.append(_s)
+        if len(top3) == 3:
+            break
 
     return html.Div([
         # KPI Row
