@@ -2,8 +2,8 @@ name: Sentinel — Daily Intelligence Sweep
 
 on:
   schedule:
-    # Midnight UTC every day
-    - cron: "0 0 * * *"
+    # Every 6 hours UTC
+    - cron: "0 */6 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
