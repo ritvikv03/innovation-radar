@@ -1072,7 +1072,7 @@ def _render_inferred_relationships() -> list:
     return items
 
 
-def _tab_graph() -> html.Div:
+def _tab_graph(status: str = "") -> html.Div:
     """Knowledge Graph — causal interdependency visualisation."""
     elements   = _load_graph_elements_cached()
     node_count = sum(1 for e in elements if "source" not in e.get("data", {}))
@@ -1090,7 +1090,7 @@ def _tab_graph() -> html.Div:
             color="info", size="sm", outline=True,
             style={"fontSize": "10px"},
         ),
-        html.Div(id="graph-action-status",
+        html.Div(id="graph-action-status", children=status,
                  style={"fontSize": "10px", "color": "#e8edf5", "marginTop": "6px"}),
     ], style={"marginBottom": "12px"})
 
@@ -1823,7 +1823,17 @@ def render_tab(tab: str, _i: int, _n: int, history: list) -> html.Div:
     if tab == "chatbot":
         return no_update if triggered != "main-tabs" else _tab_chatbot(history or [])
     if tab == "graph":
-        return no_update if triggered != "main-tabs" else _tab_graph()
+        if triggered == "interval-30s":
+            return no_update
+        try:
+            return _tab_graph()
+        except Exception as exc:
+            log.error("render_tab(graph) crashed: %s", exc, exc_info=True)
+            return html.Div(
+                f"Render error in 'graph' — check logs for details: {exc}",
+                style={"color": "#ff6090", "padding": "24px",
+                       "fontFamily": "JetBrains Mono, monospace", "fontSize": "12px"},
+            )
     dispatch = {
         "overview": _tab_overview,
         "radar":    _tab_radar,
@@ -2122,8 +2132,7 @@ def trigger_scout(n: int) -> str:
 
 
 @app.callback(
-    Output("graph-action-status", "children"),
-    Output("knowledge-graph",     "elements"),
+    Output("page-canvas", "children", allow_duplicate=True),
     Input("rebuild-graph-btn",    "n_clicks"),
     Input("run-inference-btn",    "n_clicks"),
     prevent_initial_call=True,
@@ -2131,38 +2140,35 @@ def trigger_scout(n: int) -> str:
 def graph_action(rebuild_n: int, infer_n: int):
     """Handle Rebuild Graph and Run Inference buttons.
 
-    Returns both the status message and freshly-loaded graph elements so the
-    cytoscape re-renders immediately without a page reload.
+    Re-renders the full graph tab layout (not just elements) so that sidebar
+    stats, empty-state overlay visibility, and the cytoscape all reflect the
+    updated graph.json in one shot.
     """
     triggered = callback_context.triggered_id
     if triggered == "rebuild-graph-btn":
         try:
             counts = rebuild_graph_from_db()
             _flask_cache.delete_memoized(_load_graph_elements_cached)
-            new_elements = _load_graph_elements()
-            return (
+            status = (
                 f"Graph rebuilt: {counts['nodes']} nodes, "
-                f"{counts['links']} edges, {counts['triples']} triples",
-                new_elements,
+                f"{counts['links']} edges, {counts['triples']} triples"
             )
         except Exception as exc:
             log.error("graph_action rebuild failed: %s", exc)
-            return f"Rebuild failed: {exc}", no_update
+            status = f"Rebuild failed: {exc}"
     elif triggered == "run-inference-btn":
         try:
             result = infer_hidden_relationships()
             _flask_cache.delete_memoized(_load_graph_elements_cached)
-            new_elements = _load_graph_elements()
             added = result["inferred_added"]
             total = result["total_triples"]
-            return (
-                f"Inference complete: +{added} hidden cascades ({total} total triples)",
-                new_elements,
-            )
+            status = f"Inference complete: +{added} hidden cascades ({total} total triples)"
         except Exception as exc:
             log.error("graph_action inference failed: %s", exc)
-            return f"Inference failed: {exc}", no_update
-    return no_update, no_update
+            status = f"Inference failed: {exc}"
+    else:
+        return no_update
+    return _tab_graph(status=status)
 
 
 @app.callback(
