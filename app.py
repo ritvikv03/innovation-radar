@@ -1758,6 +1758,12 @@ def _layout() -> html.Div:
         dcc.Download(id="reports-pdf-download"),
         # 30-second auto-refresh (sponsor requirement #5)
         dcc.Interval(id="interval-30s", interval=6 * 60 * 60 * 1_000, n_intervals=0),
+        # Force dash-cytoscape JS bundle to load on initial page render.
+        # Without this, the bundle is absent when the graph tab is first clicked.
+        html.Div(
+            cyto.Cytoscape(id="dummy-cyto", elements=[], layout={"name": "preset"}),
+            style={"display": "none"},
+        ),
     ], className="war-shell")
 
 app.layout = _layout()
