@@ -549,17 +549,9 @@ def _urgency_matrix(signals: list[Signal]) -> html.Div:
 
 def _tab_overview() -> html.Div:
     """Field Intelligence Overview — KPIs and high-level distribution."""
-    signals = _get_all_signals_cached()
+    signals = _get_unique_signals_cached()
     stats   = _db_stats_cached()
-    _sorted = sorted(signals, key=lambda s: s.disruption_score, reverse=True)
-    top3: list = []
-    _seen_sources: set[str] = set()
-    for _s in _sorted:
-        if _s.source_url not in _seen_sources:
-            _seen_sources.add(_s.source_url)
-            top3.append(_s)
-        if len(top3) == 3:
-            break
+    top3    = sorted(signals, key=lambda s: s.disruption_score, reverse=True)[:3]
 
     return html.Div([
         # KPI Row
@@ -1120,7 +1112,7 @@ def _tab_graph(status: str = "") -> html.Div:
                 "padding":                    50,
                 "componentSpacing":           100,
                 "nodeDimensionsIncludeLabels": True,
-                "randomize":                  False,
+                "randomize":                  True,
             },
             stylesheet=_CYTO_STYLESHEET,
             style={"width": "100%", "height": "580px",
@@ -1638,18 +1630,22 @@ def _get_all_signals_cached() -> list:
 
 
 @_flask_cache.memoize(timeout=30)
+def _get_unique_signals_cached() -> list:
+    """One signal per source_url — highest disruption_score wins."""
+    seen: set[str] = set()
+    unique: list = []
+    for s in sorted(_get_all_signals_cached(), key=lambda s: s.disruption_score, reverse=True):
+        if s.source_url not in seen:
+            seen.add(s.source_url)
+            unique.append(s)
+    return unique
+
+
+@_flask_cache.memoize(timeout=30)
 def _db_stats_cached() -> dict:
     """Cached DB stats — avoids a full get_all() on every sidebar tick."""
     try:
-        signals = _get_all_signals_cached()
-        # Deduplicate by source_url — keep highest disruption_score per source
-        _seen_urls: set[str] = set()
-        _unique: list = []
-        for s in sorted(signals, key=lambda s: s.disruption_score, reverse=True):
-            if s.source_url not in _seen_urls:
-                _seen_urls.add(s.source_url)
-                _unique.append(s)
-        signals = _unique
+        signals = _get_unique_signals_cached()
 
         scores  = [s.disruption_score for s in signals]
         by_dim: dict[str, int] = {}
@@ -1863,7 +1859,7 @@ def render_tab(tab: str, _i: int, _n: int, history: list) -> html.Div:
 )
 def update_radar(dim_filter: str, min_score: float, _i: int, _n: int):
     try:
-        signals  = _get_all_signals_cached()
+        signals  = _get_unique_signals_cached()
         fig      = _chart_radar(signals, dim_filter or "All", min_score or 0.50)
         filtered = [s for s in signals
                     if (dim_filter in (None, "All") or s.pestel_dimension.value == dim_filter)
@@ -1908,7 +1904,7 @@ def update_radar(dim_filter: str, min_score: float, _i: int, _n: int):
 )
 def update_feed(sort_by: str, dim_filter: str, _i: int, _n: int):
     try:
-        signals = _get_all_signals_cached()
+        signals = _get_unique_signals_cached()
         if dim_filter and dim_filter != "ALL":
             signals = [s for s in signals if s.pestel_dimension.value == dim_filter]
         if sort_by == "score_desc":
