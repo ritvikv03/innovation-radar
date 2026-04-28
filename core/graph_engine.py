@@ -500,7 +500,19 @@ def rebuild_graph_from_db() -> dict:
         log.info("graph_engine.rebuild: no signals in DB — graph stays empty")
         return {"nodes": 0, "links": 0, "triples": 0}
 
-    log.info("graph_engine.rebuild: processing %d signals", len(signals))
+    # Deduplicate by source_url — keep highest disruption_score per source.
+    # This limits LLM calls to unique articles and matches what the dashboard shows.
+    _seen: set[str] = set()
+    unique: list = []
+    for s in sorted(signals, key=lambda s: s.disruption_score, reverse=True):
+        if s.source_url not in _seen:
+            _seen.add(s.source_url)
+            unique.append(s)
+    total_raw = len(signals)
+    signals   = unique
+
+    log.info("graph_engine.rebuild: processing %d unique signals (deduplicated from %d)",
+             len(signals), total_raw)
 
     # 3. Re-run the graph workflow for each signal in ingestion order
     ordered = sorted(signals, key=lambda s: s.date_ingested)

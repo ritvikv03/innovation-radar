@@ -24,6 +24,7 @@ import hashlib
 import os
 import sys
 import textwrap
+import threading as _threading
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1618,6 +1619,11 @@ _flask_cache = _FlaskCache(
     config={"CACHE_TYPE": "SimpleCache", "CACHE_DEFAULT_TIMEOUT": 30},
 )
 
+# ── Knowledge-graph rebuild state ─────────────────────────────
+# Shared between graph_action() (writer) and render_tab() (reader).
+# SimpleCache is in-process so no cross-process concern; a plain dict is fine.
+_GRAPH_REBUILD: dict = {"running": False, "status": ""}
+
 
 @_flask_cache.memoize(timeout=30)
 def _get_all_signals_cached() -> list:
@@ -1822,7 +1828,8 @@ def render_tab(tab: str, _i: int, _n: int, history: list) -> html.Div:
         if triggered == "interval-30s":
             return no_update
         try:
-            return _tab_graph()
+            # Surface active rebuild status (or last result) when switching to/refreshing the tab.
+            return _tab_graph(status=_GRAPH_REBUILD.get("status", ""))
         except Exception as exc:
             log.error("render_tab(graph) crashed: %s", exc, exc_info=True)
             return html.Div(
@@ -2134,24 +2141,45 @@ def trigger_scout(n: int) -> str:
     prevent_initial_call=True,
 )
 def graph_action(rebuild_n: int, infer_n: int):
-    """Handle Rebuild Graph and Run Inference buttons.
-
-    Re-renders the full graph tab layout (not just elements) so that sidebar
-    stats, empty-state overlay visibility, and the cytoscape all reflect the
-    updated graph.json in one shot.
-    """
+    """Handle Rebuild Graph and Run Inference buttons."""
     triggered = callback_context.triggered_id
+
     if triggered == "rebuild-graph-btn":
+        if _GRAPH_REBUILD["running"]:
+            try:
+                return _tab_graph(status="Rebuild already in progress — click Refresh when complete.")
+            except Exception as exc:
+                log.error("graph_action _tab_graph failed: %s", exc)
+                return html.Div(f"Graph render error: {exc}",
+                                style={"color": "#ff6090", "padding": "24px",
+                                       "fontFamily": "JetBrains Mono, monospace"})
+
+        def _do_rebuild() -> None:
+            _GRAPH_REBUILD["running"] = True
+            _GRAPH_REBUILD["status"] = "Rebuilding in background…"
+            try:
+                counts = rebuild_graph_from_db()
+                _flask_cache.delete_memoized(_load_graph_elements_cached)
+                _GRAPH_REBUILD["status"] = (
+                    f"Graph rebuilt: {counts['nodes']} nodes, "
+                    f"{counts['links']} edges, {counts['triples']} triples"
+                )
+                log.info("graph_action: background rebuild complete — %s", _GRAPH_REBUILD["status"])
+            except Exception as exc:
+                log.error("graph_action background rebuild failed: %s", exc)
+                _GRAPH_REBUILD["status"] = f"Rebuild failed: {exc}"
+            finally:
+                _GRAPH_REBUILD["running"] = False
+
+        _threading.Thread(target=_do_rebuild, daemon=True).start()
         try:
-            counts = rebuild_graph_from_db()
-            _flask_cache.delete_memoized(_load_graph_elements_cached)
-            status = (
-                f"Graph rebuilt: {counts['nodes']} nodes, "
-                f"{counts['links']} edges, {counts['triples']} triples"
-            )
+            return _tab_graph(status="Rebuilding in background — click Refresh when complete (~60 s).")
         except Exception as exc:
-            log.error("graph_action rebuild failed: %s", exc)
-            status = f"Rebuild failed: {exc}"
+            log.error("graph_action _tab_graph failed: %s", exc)
+            return html.Div(f"Graph render error: {exc}",
+                            style={"color": "#ff6090", "padding": "24px",
+                                   "fontFamily": "JetBrains Mono, monospace"})
+
     elif triggered == "run-inference-btn":
         try:
             result = infer_hidden_relationships()
@@ -2162,9 +2190,15 @@ def graph_action(rebuild_n: int, infer_n: int):
         except Exception as exc:
             log.error("graph_action inference failed: %s", exc)
             status = f"Inference failed: {exc}"
-    else:
-        return no_update
-    return _tab_graph(status=status)
+        try:
+            return _tab_graph(status=status)
+        except Exception as exc:
+            log.error("graph_action _tab_graph failed: %s", exc)
+            return html.Div(f"Graph render error: {exc}",
+                            style={"color": "#ff6090", "padding": "24px",
+                                   "fontFamily": "JetBrains Mono, monospace"})
+
+    return no_update
 
 
 @app.callback(
