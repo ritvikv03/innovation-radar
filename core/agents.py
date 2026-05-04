@@ -53,7 +53,7 @@ log = get_logger(__name__)
 
 _HF_TOKEN    = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
 _HF_MODEL    = "meta-llama/Llama-3.1-8B-Instruct"
-_HF_PROVIDER = "novita"             # cerebras returns StopIteration intermittently
+_HF_PROVIDER = "hf-inference"       # Switched from novita (exhausted quota)
 
 
 # ── Utility: dict_to_string ───────────────────────────────────────────────────
