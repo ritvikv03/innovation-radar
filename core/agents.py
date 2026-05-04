@@ -52,7 +52,7 @@ from core.logger import get_logger
 log = get_logger(__name__)
 
 _HF_TOKEN    = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
-_HF_MODEL    = "meta-llama/Meta-Llama-3-8B-Instruct"
+_HF_MODEL    = "mistralai/Mistral-7B-Instruct-v0.3"
 _HF_PROVIDER = "hf-inference"       # Switched from novita (exhausted quota)
 
 
