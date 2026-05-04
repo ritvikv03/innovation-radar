@@ -133,6 +133,34 @@
       "category": "ENVIRONMENTAL",
       "created_at": "2026-04-14T14:37:39.706161+00:00",
       "source": "https://www.eea.europa.eu/en/topics/in-depth/agriculture"
+    },
+    {
+      "id": "16da0506-ca24-44ee-8f6a-491185fcd069",
+      "label": "UC Riverside Develops Modern-Day Ro...",
+      "category": "TECHNOLOGICAL",
+      "created_at": "2026-05-01T00:00:24.075057+00:00",
+      "source": "https://www.globalagtechinitiative.com/in-field-technologies/robotics-automation/uc-riverside-develops-modern-day-robotic-divining-rod/"
+    },
+    {
+      "id": "548463fe-892e-4d49-afb1-0b49656acd9d",
+      "label": "AI As a Human Tool, Not Standalone ...",
+      "category": "TECHNOLOGICAL",
+      "created_at": "2026-05-01T00:00:34.104112+00:00",
+      "source": "https://www.globalagtechinitiative.com/digital-farming/ai-as-a-human-tool-not-standalone-option-in-agriculture/"
+    },
+    {
+      "id": "f4cb7090-0ebc-45f5-bf15-dbbf9677fe7a",
+      "label": "George Freeman Calls For Urgent Pol...",
+      "category": "TECHNOLOGICAL",
+      "created_at": "2026-05-01T00:00:47.334206+00:00",
+      "source": "https://agritechfuture.com/smart-farming/freeman-calls-for-urgent-policy-shift-to-unlock-uk-agri-tech-investment/"
+    },
+    {
+      "id": "4a778259-cc83-417a-98f7-3404db9ef97f",
+      "label": "\u00a350m Agri-Tech Drive to Fast-Track ...",
+      "category": "TECHNOLOGICAL",
+      "created_at": "2026-05-01T00:00:57.804785+00:00",
+      "source": "https://agritechfuture.com/bio-tech/50m-agri-tech-drive-set-to-fast-track-real-world-innovation-on-uk-farms/"
     }
   ],
   "links": [
@@ -207,6 +235,78 @@
       "weight": 0.863,
       "timestamp": "2026-04-14T14:37:31.124509+00:00",
       "source_url": "https://www.agriland.co.uk/farming-news/category/machinery/"
+    },
+    {
+      "source": "16da0506-ca24-44ee-8f6a-491185fcd069",
+      "target": "1417d11a-ea2b-456c-99a2-b2b49f9b4ea9",
+      "relationship": "AMPLIFIES",
+      "pillar": "TECHNOLOGICAL",
+      "weight": 0.949,
+      "timestamp": "2026-05-01T00:00:24.075057+00:00",
+      "source_url": "https://www.globalagtechinitiative.com/in-field-technologies/robotics-automation/uc-riverside-develops-modern-day-robotic-divining-rod/"
+    },
+    {
+      "source": "16da0506-ca24-44ee-8f6a-491185fcd069",
+      "target": "e2a67394-03fd-49e7-9df8-3c192071a645",
+      "relationship": "AMPLIFIES",
+      "pillar": "TECHNOLOGICAL",
+      "weight": 0.949,
+      "timestamp": "2026-05-01T00:00:24.075057+00:00",
+      "source_url": "https://www.globalagtechinitiative.com/in-field-technologies/robotics-automation/uc-riverside-develops-modern-day-robotic-divining-rod/"
+    },
+    {
+      "source": "548463fe-892e-4d49-afb1-0b49656acd9d",
+      "target": "b6632026-543b-412b-842a-0954cc6fe327",
+      "relationship": "DEPENDS_ON",
+      "pillar": "TECHNOLOGICAL",
+      "weight": 0.896,
+      "timestamp": "2026-05-01T00:00:34.104112+00:00",
+      "source_url": "https://www.globalagtechinitiative.com/digital-farming/ai-as-a-human-tool-not-standalone-option-in-agriculture/"
+    },
+    {
+      "source": "548463fe-892e-4d49-afb1-0b49656acd9d",
+      "target": "6b549bc0-9c9e-4462-b86b-c336a78d2873",
+      "relationship": "DEPENDS_ON",
+      "pillar": "TECHNOLOGICAL",
+      "weight": 0.894,
+      "timestamp": "2026-05-01T00:00:34.104112+00:00",
+      "source_url": "https://www.globalagtechinitiative.com/digital-farming/ai-as-a-human-tool-not-standalone-option-in-agriculture/"
+    },
+    {
+      "source": "f4cb7090-0ebc-45f5-bf15-dbbf9677fe7a",
+      "target": "8ee80020-49b2-4803-8f97-c7494a4b731c",
+      "relationship": "AMPLIFIES",
+      "pillar": "TECHNOLOGICAL",
+      "weight": 0.938,
+      "timestamp": "2026-05-01T00:00:47.334206+00:00",
+      "source_url": "https://agritechfuture.com/smart-farming/freeman-calls-for-urgent-policy-shift-to-unlock-uk-agri-tech-investment/"
+    },
+    {
+      "source": "f4cb7090-0ebc-45f5-bf15-dbbf9677fe7a",
+      "target": "dabf5016-d650-4c3a-b01e-62b77eb11481",
+      "relationship": "AMPLIFIES",
+      "pillar": "TECHNOLOGICAL",
+      "weight": 0.933,
+      "timestamp": "2026-05-01T00:00:47.334206+00:00",
+      "source_url": "https://agritechfuture.com/smart-farming/freeman-calls-for-urgent-policy-shift-to-unlock-uk-agri-tech-investment/"
+    },
+    {
+      "source": "4a778259-cc83-417a-98f7-3404db9ef97f",
+      "target": "3f02616d-4057-42dc-9d47-0e854cfca937",
+      "relationship": "DRIVES",
+      "pillar": "TECHNOLOGICAL",
+      "weight": 0.937,
+      "timestamp": "2026-05-01T00:00:57.804785+00:00",
+      "source_url": "https://agritechfuture.com/bio-tech/50m-agri-tech-drive-set-to-fast-track-real-world-innovation-on-uk-farms/"
+    },
+    {
+      "source": "4a778259-cc83-417a-98f7-3404db9ef97f",
+      "target": "cd81cbb0-e00b-484f-886e-59297e20417c",
+      "relationship": "AMPLIFIES",
+      "pillar": "TECHNOLOGICAL",
+      "weight": 0.935,
+      "timestamp": "2026-05-01T00:00:57.804785+00:00",
+      "source_url": "https://agritechfuture.com/bio-tech/50m-agri-tech-drive-set-to-fast-track-real-world-innovation-on-uk-farms/"
     }
   ],
   "triples": [
@@ -404,6 +504,206 @@
         "weight": 0.863,
         "timestamp": "2026-04-14T14:37:31.124509+00:00",
         "source_url": "https://www.agriland.co.uk/farming-news/category/machinery/",
+        "causal_chain": [
+          "TECHNOLOGICAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "16da0506_1417d11a",
+      "subject": {
+        "id": "16da0506-ca24-44ee-8f6a-491185fcd069",
+        "label": "UC Riverside Develops Modern-Day Ro...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "predicate": "AMPLIFIES",
+      "object": {
+        "id": "1417d11a-ea2b-456c-99a2-b2b49f9b4ea9",
+        "label": "UC Riverside Develops Modern-Day Ro...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "metadata": {
+        "weight": 0.949,
+        "timestamp": "2026-05-01T00:00:24.075057+00:00",
+        "source_url": "https://www.globalagtechinitiative.com/in-field-technologies/robotics-automation/uc-riverside-develops-modern-day-robotic-divining-rod/",
+        "causal_chain": [
+          "TECHNOLOGICAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "16da0506_e2a67394",
+      "subject": {
+        "id": "16da0506-ca24-44ee-8f6a-491185fcd069",
+        "label": "UC Riverside Develops Modern-Day Ro...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "predicate": "AMPLIFIES",
+      "object": {
+        "id": "e2a67394-03fd-49e7-9df8-3c192071a645",
+        "label": "UC Riverside Develops Modern-Day Ro...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "metadata": {
+        "weight": 0.949,
+        "timestamp": "2026-05-01T00:00:24.075057+00:00",
+        "source_url": "https://www.globalagtechinitiative.com/in-field-technologies/robotics-automation/uc-riverside-develops-modern-day-robotic-divining-rod/",
+        "causal_chain": [
+          "TECHNOLOGICAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "548463fe_b6632026",
+      "subject": {
+        "id": "548463fe-892e-4d49-afb1-0b49656acd9d",
+        "label": "AI As a Human Tool, Not Standalone ...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "predicate": "DEPENDS_ON",
+      "object": {
+        "id": "b6632026-543b-412b-842a-0954cc6fe327",
+        "label": "AI As a Human Tool, Not Standalone ...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "metadata": {
+        "weight": 0.896,
+        "timestamp": "2026-05-01T00:00:34.104112+00:00",
+        "source_url": "https://www.globalagtechinitiative.com/digital-farming/ai-as-a-human-tool-not-standalone-option-in-agriculture/",
+        "causal_chain": [
+          "TECHNOLOGICAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "548463fe_6b549bc0",
+      "subject": {
+        "id": "548463fe-892e-4d49-afb1-0b49656acd9d",
+        "label": "AI As a Human Tool, Not Standalone ...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "predicate": "DEPENDS_ON",
+      "object": {
+        "id": "6b549bc0-9c9e-4462-b86b-c336a78d2873",
+        "label": "AI As a Human Tool, Not Standalone ...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "metadata": {
+        "weight": 0.894,
+        "timestamp": "2026-05-01T00:00:34.104112+00:00",
+        "source_url": "https://www.globalagtechinitiative.com/digital-farming/ai-as-a-human-tool-not-standalone-option-in-agriculture/",
+        "causal_chain": [
+          "TECHNOLOGICAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "f4cb7090_8ee80020",
+      "subject": {
+        "id": "f4cb7090-0ebc-45f5-bf15-dbbf9677fe7a",
+        "label": "George Freeman Calls For Urgent Pol...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "predicate": "AMPLIFIES",
+      "object": {
+        "id": "8ee80020-49b2-4803-8f97-c7494a4b731c",
+        "label": "George Freeman Calls for Urgent Pol...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "metadata": {
+        "weight": 0.938,
+        "timestamp": "2026-05-01T00:00:47.334206+00:00",
+        "source_url": "https://agritechfuture.com/smart-farming/freeman-calls-for-urgent-policy-shift-to-unlock-uk-agri-tech-investment/",
+        "causal_chain": [
+          "TECHNOLOGICAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "f4cb7090_dabf5016",
+      "subject": {
+        "id": "f4cb7090-0ebc-45f5-bf15-dbbf9677fe7a",
+        "label": "George Freeman Calls For Urgent Pol...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "predicate": "AMPLIFIES",
+      "object": {
+        "id": "dabf5016-d650-4c3a-b01e-62b77eb11481",
+        "label": "George Freeman Calls for Urgent Pol...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "metadata": {
+        "weight": 0.933,
+        "timestamp": "2026-05-01T00:00:47.334206+00:00",
+        "source_url": "https://agritechfuture.com/smart-farming/freeman-calls-for-urgent-policy-shift-to-unlock-uk-agri-tech-investment/",
+        "causal_chain": [
+          "TECHNOLOGICAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "4a778259_3f02616d",
+      "subject": {
+        "id": "4a778259-cc83-417a-98f7-3404db9ef97f",
+        "label": "\u00a350m Agri-Tech Drive to Fast-Track ...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "predicate": "DRIVES",
+      "object": {
+        "id": "3f02616d-4057-42dc-9d47-0e854cfca937",
+        "label": "\u00a350m Agri-Tech Drive Set To Fast-Tr...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "metadata": {
+        "weight": 0.937,
+        "timestamp": "2026-05-01T00:00:57.804785+00:00",
+        "source_url": "https://agritechfuture.com/bio-tech/50m-agri-tech-drive-set-to-fast-track-real-world-innovation-on-uk-farms/",
+        "causal_chain": [
+          "TECHNOLOGICAL"
+        ],
+        "causal_depth": 0
+      }
+    },
+    {
+      "id": "4a778259_cd81cbb0",
+      "subject": {
+        "id": "4a778259-cc83-417a-98f7-3404db9ef97f",
+        "label": "\u00a350m Agri-Tech Drive to Fast-Track ...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "predicate": "AMPLIFIES",
+      "object": {
+        "id": "cd81cbb0-e00b-484f-886e-59297e20417c",
+        "label": "\u00a350m Agri-Tech Drive to Fast-Track ...",
+        "type": "Signal",
+        "pillar": "TECHNOLOGICAL"
+      },
+      "metadata": {
+        "weight": 0.935,
+        "timestamp": "2026-05-01T00:00:57.804785+00:00",
+        "source_url": "https://agritechfuture.com/bio-tech/50m-agri-tech-drive-set-to-fast-track-real-world-innovation-on-uk-farms/",
         "causal_chain": [
           "TECHNOLOGICAL"
         ],

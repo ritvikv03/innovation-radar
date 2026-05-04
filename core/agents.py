@@ -128,7 +128,7 @@ class AgentState(TypedDict):
 
 def _hf_chat(
     messages: list[dict],
-    max_tokens: int = 512,
+    max_tokens: int = 1024,
     temperature: float = 0.2,
 ) -> str:
     """Fire a chat_completion call via HuggingFace InferenceClient."""
@@ -463,7 +463,7 @@ def analyst_node(state: AgentState) -> AgentState:
                     ),
                 },
             ],
-            max_tokens=400,
+            max_tokens=1024,
             temperature=0.25,
         )
         confidence = "high" if signals else "low"
