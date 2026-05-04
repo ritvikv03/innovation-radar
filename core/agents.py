@@ -52,8 +52,8 @@ from core.logger import get_logger
 log = get_logger(__name__)
 
 _HF_TOKEN    = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
-_HF_MODEL    = "meta-llama/Meta-Llama-3-8B-Instruct"
-_HF_PROVIDER = "nebius"              # hf-inference dropped large LLM support (July 2025)
+_HF_MODEL    = "Qwen/Qwen2.5-7B-Instruct"
+_HF_PROVIDER = "auto"                # Let HF pick the best available provider
 
 
 # ── Utility: dict_to_string ───────────────────────────────────────────────────
